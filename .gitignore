@@ -1,0 +1,25 @@
+# Python
+fsl_env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+
+# Large data files
+ml_pipeline/data/raw/
+ml_pipeline/data/processed/
+*.npy
+*.h5
+*.keras
+
+# TFLite models
+*.tflite
+
+# Flutter
+flutter_app/.dart_tool/
+flutter_app/build/
+flutter_app/.flutter-plugins
+flutter_app/.flutter-plugins-dependencies
+
+# VS Code
+.vscode/settings.json
