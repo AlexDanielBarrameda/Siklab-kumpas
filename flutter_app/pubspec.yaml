@@ -1,0 +1,40 @@
+name: siklab_kumpas
+description: A bi-directional Filipino Sign Language translation app.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Camera
+  camera: ^0.11.0
+
+  # Speech
+  speech_to_text: ^7.0.0
+  flutter_tts: ^4.0.0
+
+  # Permissions
+  permission_handler: ^11.0.0
+
+  # Flashlight
+  torch_light: ^1.0.0
+
+  # UI
+  cupertino_icons: ^1.0.2
+  google_fonts: ^6.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/models/
+    - assets/labels/

@@ -1,0 +1,6 @@
+# Handle line endings automatically for text files
+* text=auto
+
+# Explicitly set python and text files to always use LF (good for WSL)
+*.py text eol=lf
+*.txt text eol=lf
