@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.siklabkumpas.siklab_kumpas"
-    compileSdk = 35
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -45,13 +45,14 @@ android {
             excludes += "META-INF/LICENSE-notice.md"
         }
     }
+
+    aaptOptions {
+    noCompress += "tflite"
+    }
 }
 
 dependencies {
-    // TFLite with Select TF Ops support (required for LSTM model)
-    implementation("org.tensorflow:tensorflow-lite:2.16.1")
     implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1")
-    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
 }
 
 flutter {

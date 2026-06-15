@@ -26,6 +26,7 @@ dependencies:
   # UI
   cupertino_icons: ^1.0.2
   google_fonts: ^6.0.0
+  tflite_flutter: ^0.12.1
 
 dev_dependencies:
   flutter_test:

@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:camera/camera.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../main.dart';
+import '../services/camera_service.dart';
+import '../services/inference_service.dart';
 
 class DeafMuteScreen extends StatefulWidget {
   const DeafMuteScreen({super.key});
@@ -8,11 +12,14 @@ class DeafMuteScreen extends StatefulWidget {
   State<DeafMuteScreen> createState() => _DeafMuteScreenState();
 }
 
-class _DeafMuteScreenState extends State<DeafMuteScreen> {
+class _DeafMuteScreenState extends State<DeafMuteScreen>
+    with WidgetsBindingObserver {
   static const _orange = Color(0xFFFF6B00);
 
   bool _isDetecting = false;
-  List<String> _translationLog = [];
+  bool _cameraReady = false;
+  bool _permissionDenied = false;
+  final List<String> _translationLog = [];
 
   final List<String> _preRecordedEn = [
     'None',
@@ -30,6 +37,63 @@ class _DeafMuteScreenState extends State<DeafMuteScreen> {
     'Magandang araw! Maari ba tayong mag-usap?',
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _initCamera();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive) {
+      CameraService.stopImageStream();
+    } else if (state == AppLifecycleState.resumed && _cameraReady) {
+      CameraService.initialize().then((_) => setState(() {}));
+    }
+  }
+
+  Future<void> _initCamera() async {
+    final status = await Permission.camera.request();
+    if (status.isDenied || status.isPermanentlyDenied) {
+      setState(() => _permissionDenied = true);
+      return;
+    }
+
+    await CameraService.initialize();
+    if (mounted) {
+      setState(() => _cameraReady = CameraService.isInitialized);
+    }
+  }
+
+  Future<void> _toggleDetection() async {
+    if (!_cameraReady) return;
+
+    if (_isDetecting) {
+      await CameraService.stopImageStream();
+      InferenceService.clearBuffer();
+      setState(() => _isDetecting = false);
+    } else {
+      await InferenceService.initialize();
+      setState(() {
+        _isDetecting = true;
+        _translationLog.clear();
+      });
+      await CameraService.startImageStream((CameraImage image) async {
+        final result = await InferenceService.processFrame(image);
+        if (result != null && mounted) {
+          setState(() {
+            _translationLog.insert(0,
+              '${result.label} (${result.confidencePercent})');
+            if (_translationLog.length > 5) {
+              _translationLog.removeLast();
+            }
+          });
+        }
+      });
+    }
+  }
+
   void _showSignalModal(BuildContext context, bool isFilipino) {
     showModalBottomSheet(
       context: context,
@@ -40,6 +104,14 @@ class _DeafMuteScreenState extends State<DeafMuteScreen> {
         preRecorded: isFilipino ? _preRecordedFil : _preRecordedEn,
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    CameraService.stopImageStream();
+    CameraService.dispose();
+    super.dispose();
   }
 
   @override
@@ -76,7 +148,7 @@ class _DeafMuteScreenState extends State<DeafMuteScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          isFilipino ? 'Initiator Mode' : 'Initiator Mode',
+                          'Initiator Mode',
                           style: TextStyle(
                             color: textColor,
                             fontSize: 18,
@@ -84,7 +156,9 @@ class _DeafMuteScreenState extends State<DeafMuteScreen> {
                           ),
                         ),
                         Text(
-                          isFilipino ? 'Bingi / Pipi POV' : 'Deaf / Mute POV',
+                          isFilipino
+                              ? 'Bingi / Pipi POV'
+                              : 'Deaf / Mute POV',
                           style: TextStyle(
                               color: subtitleColor, fontSize: 12),
                         ),
@@ -124,9 +198,7 @@ class _DeafMuteScreenState extends State<DeafMuteScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   decoration: BoxDecoration(
-                    color: _isDetecting
-                        ? _orange
-                        : cardColor,
+                    color: cardColor,
                     borderRadius: BorderRadius.circular(32),
                     border: Border.all(
                       color: _orange.withValues(alpha: 0.3),
@@ -136,19 +208,15 @@ class _DeafMuteScreenState extends State<DeafMuteScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        Icons.notifications_outlined,
-                        color: _isDetecting ? Colors.white : textColor,
-                        size: 20,
-                      ),
+                      Icon(Icons.notifications_outlined,
+                          color: textColor, size: 20),
                       const SizedBox(width: 8),
                       Text(
                         isFilipino
                             ? 'Senyas para sa Pag-uusap'
                             : 'Signal for Conversation',
                         style: TextStyle(
-                          color:
-                              _isDetecting ? Colors.white : textColor,
+                          color: textColor,
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
                         ),
@@ -163,97 +231,150 @@ class _DeafMuteScreenState extends State<DeafMuteScreen> {
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1A2332),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: _orange.withValues(alpha: 0.4),
-                      width: 1.5,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A2332),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: _isDetecting
+                            ? _orange
+                            : _orange.withValues(alpha: 0.3),
+                        width: 1.5,
+                      ),
                     ),
-                  ),
-                  child: Stack(
-                    children: [
-                      // Camera placeholder
-                      Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.camera_alt_outlined,
-                                color: Colors.white24, size: 48),
-                            const SizedBox(height: 8),
-                            Text(
-                              isFilipino
-                                  ? 'Kamera'
-                                  : 'Camera',
-                              style: const TextStyle(
-                                  color: Colors.white24, fontSize: 13),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // LIVE badge
-                      Positioned(
-                        top: 12,
-                        left: 12,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.red,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: const [
-                              Icon(Icons.circle,
-                                  color: Colors.white, size: 8),
-                              SizedBox(width: 4),
-                              Text(
-                                'LIVE',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
+                    child: Stack(
+                      children: [
+                        // Camera preview or placeholder
+                        if (_permissionDenied)
+                          Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.videocam_off_outlined,
+                                      color: Colors.white38, size: 48),
+                                const SizedBox(height: 12),
+                                Text(
+                                  isFilipino
+                                      ? 'Kailangan ng pahintulot sa camera'
+                                      : 'Camera permission required',
+                                  style: const TextStyle(
+                                      color: Colors.white38,
+                                      fontSize: 13),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(height: 12),
+                                TextButton(
+                                  onPressed: () =>
+                                      openAppSettings(),
+                                  child: const Text('Open Settings',
+                                      style: TextStyle(
+                                          color: _orange)),
+                                ),
+                              ],
+                            ),
+                          )
+                        else if (_cameraReady &&
+                            CameraService.controller != null)
+                          Positioned.fill(
+                            child: CameraPreview(
+                                CameraService.controller!),
+                          )
+                        else
+                          Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const CircularProgressIndicator(
+                                    color: _orange),
+                                const SizedBox(height: 12),
+                                Text(
+                                  isFilipino
+                                      ? 'Sinisimulan ang camera...'
+                                      : 'Starting camera...',
+                                  style: const TextStyle(
+                                      color: Colors.white38,
+                                      fontSize: 13),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ),
 
-                      // Start/Stop detecting button
-                      Positioned(
-                        bottom: 12,
-                        right: 12,
-                        child: GestureDetector(
-                          onTap: () =>
-                              setState(() => _isDetecting = !_isDetecting),
+                        // LIVE badge
+                        Positioned(
+                          top: 12,
+                          left: 12,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 8),
+                                horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
                               color: _isDetecting
                                   ? Colors.red
-                                  : _orange,
+                                  : Colors.black54,
                               borderRadius: BorderRadius.circular(20),
                             ),
-                            child: Text(
-                              _isDetecting
-                                  ? (isFilipino ? 'Ihinto' : 'Stop')
-                                  : (isFilipino ? 'Simulan' : 'Start'),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.circle,
+                                  color: _isDetecting
+                                      ? Colors.white
+                                      : Colors.white38,
+                                  size: 8,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'LIVE',
+                                  style: TextStyle(
+                                    color: _isDetecting
+                                        ? Colors.white
+                                        : Colors.white38,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        // Start/Stop button
+                        Positioned(
+                          bottom: 12,
+                          right: 12,
+                          child: GestureDetector(
+                            onTap: _toggleDetection,
+                            child: AnimatedContainer(
+                              duration:
+                                  const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: _isDetecting
+                                    ? Colors.red
+                                    : _orange,
+                                borderRadius:
+                                    BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                _isDetecting
+                                    ? (isFilipino ? 'Ihinto' : 'Stop')
+                                    : (isFilipino
+                                        ? 'Simulan'
+                                        : 'Start'),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -300,7 +421,8 @@ class _DeafMuteScreenState extends State<DeafMuteScreen> {
                             ? '> Pindutin ang Simulan para magsimula'
                             : '> Press Start to begin detecting'),
                     style: TextStyle(
-                      color: _isDetecting ? _orange : subtitleColor,
+                      color:
+                          _isDetecting ? _orange : subtitleColor,
                       fontSize: 13,
                       fontFamily: 'monospace',
                     ),
@@ -365,31 +487,32 @@ class _SignalModalState extends State<_SignalModal> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Title row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    isFilipino
-                        ? 'Senyas para sa Pag-uusap'
-                        : 'Signal for Conversation',
-                    style: TextStyle(
-                      color: textColor,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isFilipino
+                          ? 'Senyas para sa Pag-uusap'
+                          : 'Signal for Conversation',
+                      style: TextStyle(
+                        color: textColor,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                  Text(
-                    isFilipino
-                        ? 'Pumili kung paano kunin ang kanilang atensyon'
-                        : 'Choose how to get their attention',
-                    style:
-                        TextStyle(color: subtitleColor, fontSize: 12),
-                  ),
-                ],
+                    Text(
+                      isFilipino
+                          ? 'Pumili kung paano kunin ang kanilang atensyon'
+                          : 'Choose how to get their attention',
+                      style: TextStyle(
+                          color: subtitleColor, fontSize: 12),
+                    ),
+                  ],
+                ),
               ),
               GestureDetector(
                 onTap: () => Navigator.pop(context),
@@ -400,14 +523,16 @@ class _SignalModalState extends State<_SignalModal> {
 
           const SizedBox(height: 20),
 
-          // Flicker lights section
+          // Flicker section
           Row(
             children: [
               const Icon(Icons.lightbulb_outline,
                   color: _orange, size: 20),
               const SizedBox(width: 8),
               Text(
-                isFilipino ? 'Kumikislap na Ilaw' : 'Flicker Lights',
+                isFilipino
+                    ? 'Kumikislap na Ilaw'
+                    : 'Flicker Lights',
                 style: TextStyle(
                   color: textColor,
                   fontSize: 15,
@@ -425,18 +550,18 @@ class _SignalModalState extends State<_SignalModal> {
           ),
           const SizedBox(height: 10),
 
-          // Flicker toggle
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(
+                horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: _flickerEnabled
                   ? _orange.withValues(alpha: 0.1)
                   : cardColor,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color:
-                    _flickerEnabled ? _orange : Colors.transparent,
+                color: _flickerEnabled
+                    ? _orange
+                    : Colors.transparent,
                 width: 1.5,
               ),
             ),
@@ -444,9 +569,12 @@ class _SignalModalState extends State<_SignalModal> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  isFilipino ? 'Kumikislap na Ilaw' : 'Flicker Lights',
+                  isFilipino
+                      ? 'Kumikislap na Ilaw'
+                      : 'Flicker Lights',
                   style: TextStyle(
-                    color: _flickerEnabled ? _orange : textColor,
+                    color:
+                        _flickerEnabled ? _orange : textColor,
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
@@ -455,7 +583,8 @@ class _SignalModalState extends State<_SignalModal> {
                   value: _flickerEnabled,
                   onChanged: (v) =>
                       setState(() => _flickerEnabled = v),
-                  activeColor: _orange,
+                  activeThumbColor: _orange,
+                  activeTrackColor: _orange.withValues(alpha: 0.3),
                 ),
               ],
             ),
@@ -470,7 +599,9 @@ class _SignalModalState extends State<_SignalModal> {
                   color: _orange, size: 20),
               const SizedBox(width: 8),
               Text(
-                isFilipino ? 'Mag-play ng Audio Spiel' : 'Play Audio Spiel',
+                isFilipino
+                    ? 'Mag-play ng Audio Spiel'
+                    : 'Play Audio Spiel',
                 style: TextStyle(
                   color: textColor,
                   fontSize: 15,
@@ -488,7 +619,6 @@ class _SignalModalState extends State<_SignalModal> {
           ),
           const SizedBox(height: 10),
 
-          // Message list
           ...List.generate(widget.preRecorded.length, (i) {
             final isSelected = _selectedMessage == i;
             return Padding(
@@ -505,7 +635,9 @@ class _SignalModalState extends State<_SignalModal> {
                         : cardColor,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: isSelected ? _orange : Colors.transparent,
+                      color: isSelected
+                          ? _orange
+                          : Colors.transparent,
                       width: 1.5,
                     ),
                   ),
@@ -535,15 +667,11 @@ class _SignalModalState extends State<_SignalModal> {
 
           const SizedBox(height: 16),
 
-          // Start conversation button
           SizedBox(
             width: double.infinity,
             height: 52,
             child: ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                // Signal logic will be wired here
-              },
+              onPressed: () => Navigator.pop(context),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _orange,
                 foregroundColor: Colors.white,
@@ -563,7 +691,6 @@ class _SignalModalState extends State<_SignalModal> {
 
           const SizedBox(height: 10),
 
-          // Cancel button
           SizedBox(
             width: double.infinity,
             height: 48,
@@ -571,7 +698,8 @@ class _SignalModalState extends State<_SignalModal> {
               onPressed: () => Navigator.pop(context),
               child: Text(
                 isFilipino ? 'Kanselahin' : 'Cancel',
-                style: TextStyle(color: subtitleColor, fontSize: 15),
+                style:
+                    TextStyle(color: subtitleColor, fontSize: 15),
               ),
             ),
           ),

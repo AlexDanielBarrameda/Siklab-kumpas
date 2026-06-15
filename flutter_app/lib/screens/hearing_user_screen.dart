@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
+import '../services/speech_service.dart';
 
 class HearingUserScreen extends StatefulWidget {
   const HearingUserScreen({super.key});
@@ -18,8 +19,16 @@ class _HearingUserScreenState extends State<HearingUserScreen> {
   double _voiceSpeed = 1.0;
 
   @override
+  void initState() {
+    super.initState();
+    SpeechService.initSTT();
+    SpeechService.initTTS();
+  }
+
+  @override
   void dispose() {
     _textController.dispose();
+    SpeechService.dispose();
     super.dispose();
   }
 
@@ -132,7 +141,7 @@ class _HearingUserScreenState extends State<HearingUserScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: _selectedTab == 0
                       ? _buildVoiceTab(cardColor, textColor,
-                          subtitleColor, isFilipino)
+                          subtitleColor, lang, isFilipino)
                       : _buildTextTab(cardColor, textColor,
                           subtitleColor, inputBg, isFilipino),
                 ),
@@ -174,6 +183,7 @@ class _HearingUserScreenState extends State<HearingUserScreen> {
     Color cardColor,
     Color textColor,
     Color subtitleColor,
+    String lang,
     bool isFilipino,
   ) {
     return Column(
@@ -212,7 +222,33 @@ class _HearingUserScreenState extends State<HearingUserScreen> {
 
         // Mic button
         GestureDetector(
-          onTap: () => setState(() => _isListening = !_isListening),
+          onTap: () async {
+            final available = await SpeechService.initSTT();
+            if (!available) {
+              setState(() => _textOutput = 'Speech recognition not available on this device');
+              return;
+            }
+
+            if (_isListening) {
+              await SpeechService.stopListening();
+              setState(() => _isListening = false);
+            } else {
+              setState(() {
+                _isListening = true;
+                _textOutput = 'Listening...';
+              });
+              await SpeechService.startListening(
+                lang: lang,
+                onResult: (text) {
+                  setState(() {
+                    _textOutput = text;
+                    _isListening = false;
+                  });
+                  SpeechService.speak(text);
+                },
+              );
+            }
+          },
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             width: 72,
@@ -379,8 +415,7 @@ class _HearingUserScreenState extends State<HearingUserScreen> {
                 isFilipino
                     ? 'Output ng FSL Avatar'
                     : 'FSL Avatar Output',
-                style:
-                    TextStyle(color: subtitleColor, fontSize: 14),
+                style: TextStyle(color: subtitleColor, fontSize: 14),
               ),
             ],
           ),
@@ -402,8 +437,7 @@ class _HearingUserScreenState extends State<HearingUserScreen> {
                 isFilipino
                     ? 'Output ng Pagsasalita:'
                     : 'Speech Output:',
-                style:
-                    TextStyle(color: subtitleColor, fontSize: 12),
+                style: TextStyle(color: subtitleColor, fontSize: 12),
               ),
               const SizedBox(width: 8),
               const Icon(Icons.circle, color: Colors.green, size: 10),
@@ -424,7 +458,12 @@ class _HearingUserScreenState extends State<HearingUserScreen> {
           width: double.infinity,
           height: 56,
           child: ElevatedButton(
-            onPressed: () {},
+            onPressed: () {
+              final text = _textController.text.trim();
+              if (text.isNotEmpty) {
+                SpeechService.speak(text, rate: _voiceSpeed);
+              }
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: _orange,
               foregroundColor: Colors.white,
@@ -479,7 +518,9 @@ class _TabButton extends StatelessWidget {
             children: [
               Icon(
                 icon,
-                color: isSelected ? const Color(0xFFFF6B00) : Colors.grey,
+                color: isSelected
+                    ? const Color(0xFFFF6B00)
+                    : Colors.grey,
                 size: 22,
               ),
               const SizedBox(height: 4),
