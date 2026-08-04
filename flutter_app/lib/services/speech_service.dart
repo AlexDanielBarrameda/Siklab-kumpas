@@ -7,24 +7,43 @@ class SpeechService {
   static final stt.SpeechToText _stt = stt.SpeechToText();
   static bool _sttInitialized = false;
 
+  /// Platform speech rate that sounds like normal speaking pace.
+  ///
+  /// flutter_tts takes 0.0-1.0 on Android, where **0.5 is normal** and 1.0 is
+  /// roughly double speed. The previous default of 1.0 was therefore reading
+  /// everything at ~2x, which is why output was hard to follow.
+  static const double _platformNormal = 0.5;
+
+  /// User-facing speed, where 1.0x means natural speaking pace. Callers work in
+  /// these units; [_toPlatformRate] converts to what the engine expects.
+  static double speedMultiplier = 1.0;
+
+  static double _toPlatformRate(double multiplier) =>
+      (multiplier * _platformNormal).clamp(0.05, 1.0);
+
   static Future<void> initTTS({
     String language = 'en-US',
-    double rate = 1.0,
+    double? speed,
   }) async {
     try {
+      if (speed != null) speedMultiplier = speed;
       await _tts.setLanguage(language);
-      await _tts.setSpeechRate(rate);
+      await _tts.setSpeechRate(_toPlatformRate(speedMultiplier));
       await _tts.setVolume(1.0);
       await _tts.setPitch(1.0);
-      debugPrint('TTS initialized successfully');
+      debugPrint('TTS initialized (speed ${speedMultiplier}x -> '
+          '${_toPlatformRate(speedMultiplier)})');
     } catch (e) {
       debugPrint('TTS init error: $e');
     }
   }
 
-  static Future<void> speak(String text, {double rate = 1.0}) async {
+  /// [speed] is a multiplier where 1.0 is natural pace, not the raw engine
+  /// value. Omit it to use [speedMultiplier].
+  static Future<void> speak(String text, {double? speed}) async {
     try {
-      debugPrint('Speaking: $text');
+      final rate = _toPlatformRate(speed ?? speedMultiplier);
+      debugPrint('Speaking (${speed ?? speedMultiplier}x -> $rate): $text');
       await _tts.setSpeechRate(rate);
       final result = await _tts.speak(text);
       debugPrint('TTS speak result: $result');

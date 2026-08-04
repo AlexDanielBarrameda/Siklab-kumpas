@@ -16,7 +16,8 @@ class _HearingUserScreenState extends State<HearingUserScreen> {
   bool _isListening = false;
   String _textOutput = '';
   final TextEditingController _textController = TextEditingController();
-  double _voiceSpeed = 1.0;
+  /// Multiplier where 1.0 = natural speaking pace (see SpeechService).
+  double _voiceSpeed = SpeechService.speedMultiplier;
 
   @override
   void initState() {
@@ -353,14 +354,20 @@ class _HearingUserScreenState extends State<HearingUserScreen> {
         const SizedBox(height: 8),
 
         // Speed slider
+        // Range capped at 1.6x: the engine tops out at its own maximum, so a
+        // higher ceiling would be a slider that visibly moves without changing
+        // anything (the old 0.5-2.0 range did exactly that above 1.0).
         Slider(
           value: _voiceSpeed,
           min: 0.5,
-          max: 2.0,
-          divisions: 6,
+          max: 1.6,
+          divisions: 11,
           activeColor: _orange,
           inactiveColor: _orange.withValues(alpha: 0.2),
-          onChanged: (v) => setState(() => _voiceSpeed = v),
+          onChanged: (v) => setState(() {
+            _voiceSpeed = v;
+            SpeechService.speedMultiplier = v;
+          }),
         ),
 
         const SizedBox(height: 8),
@@ -461,7 +468,7 @@ class _HearingUserScreenState extends State<HearingUserScreen> {
             onPressed: () {
               final text = _textController.text.trim();
               if (text.isNotEmpty) {
-                SpeechService.speak(text, rate: _voiceSpeed);
+                SpeechService.speak(text, speed: _voiceSpeed);
               }
             },
             style: ElevatedButton.styleFrom(

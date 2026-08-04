@@ -29,6 +29,7 @@ android {
         ndk {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64")
         }
+        multiDexEnabled = true
     }
 
     buildTypes {
@@ -52,7 +53,7 @@ android {
 }
 
 dependencies {
-    implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1")
+    implementation("com.google.mediapipe:tasks-vision:0.10.0")
 }
 
 flutter {
