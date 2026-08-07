@@ -44,6 +44,71 @@ class InferenceService {
 
   static final List<_Vote> _letterVotes = [];
 
+  /// Sign segmentation for WORDS. A sign is the span between the hands
+  /// appearing and leaving frame, so its length adapts to the sign instead of
+  /// being forced into a fixed window.
+  static const int wordEndSilenceFrames = 3;
+  static const int wordMinFrames = 6;
+  static const int wordMaxDurationMs = 5000;
+
+  /// Posture gating: distinguishes resting from signing by how high the wrists
+  /// sit, so a signer whose hands stay visible at rest still gets a clean
+  /// start and end.
+  ///
+  /// Hands-leaving-frame alone fails when the whole body is in view: the hands
+  /// never disappear, so the sign never ends and nothing is ever classified.
+  ///
+  /// Height is measured as (shoulder_y - wrist_y) / shoulder_width, using the
+  /// higher wrist. Shoulders carry visibility 1.00 on every frame, unlike hips
+  /// (0.57), and shoulder width gives a scale that does not depend on how far
+  /// away the signer stands. Measured on the source clips:
+  ///   resting  median -1.8   (p90 -0.9)
+  ///   signing  median -1.1   (p90 -0.1)
+  ///
+  /// The two overlap at the low end, because plenty of signs sit at chest
+  /// height, so a single instantaneous threshold would cut a sign in half.
+  /// Entry is therefore a high bar crossed once, and exit must be *sustained*
+  /// — rest is continuous, whereas a mid-sign dip is brief.
+  static const double postureEnter = -0.6;
+  static const double postureExit = -1.5;
+  static const int postureExitFrames = 4;
+
+  /// Last computed wrist height, and whether a sign is currently in progress.
+  static double postureHeight = 0;
+  static bool postureValid = false;
+  static bool _signing = false;
+  static int _belowExitStreak = 0;
+
+  static String get postureLabel {
+    if (!postureValid) return 'posture n/a';
+    return '${_signing ? "signing" : "resting"} '
+        '${postureHeight.toStringAsFixed(1)}';
+  }
+
+  /// Wrist height above the shoulder line, in shoulder-widths. Returns null
+  /// when the pose landmarks needed are missing, in which case the caller falls
+  /// back to hands-in-frame segmentation.
+  static double? _wristHeight(List<double> v) {
+    double px(int j, int c) => v[126 + j * 4 + c];
+    final lsX = px(11, 0), lsY = px(11, 1);
+    final rsX = px(12, 0), rsY = px(12, 1);
+    if (lsX == 0 && lsY == 0) return null;
+    if (rsX == 0 && rsY == 0) return null;
+
+    final width = math.sqrt(
+        (lsX - rsX) * (lsX - rsX) + (lsY - rsY) * (lsY - rsY));
+    if (width < 1e-4) return null;
+
+    final lwY = px(15, 1), rwY = px(16, 1);
+    if (lwY == 0 && rwY == 0) return null;
+    // y grows downward, so the higher wrist is the smaller value.
+    final wrist = (lwY == 0)
+        ? rwY
+        : (rwY == 0 ? lwY : math.min(lwY, rwY));
+
+    return ((lsY + rsY) / 2 - wrist) / width;
+  }
+
   /// Duration of signing the 30-frame buffer represents.
   ///
   /// Measured: the FSL-105 clips are 60 fps / ~244 frames / ~4.07 s. The original
@@ -52,14 +117,15 @@ class InferenceService {
   /// samples across the whole clip and keeps the hand-present frames, so a
   /// training sequence now spans the full gesture.
   ///
-  /// This window has to match that span, otherwise the same motion is played to
-  /// the model at the wrong speed.
+  /// NO LONGER USED for inference — kept only as the documented median.
   ///
-  /// Measured, not estimated: across 20 sampled clips the hands are only visible
-  /// for a median of 1.38 s of the 4.07 s clip (p10 1.19, p90 1.89) — the rest is
-  /// the signer at rest before and after. A v2 training sequence therefore spans
-  /// ~1.4 s of actual signing, so that is what the live window must cover.
-  static const int windowMs = 1400;
+  /// A fixed window was the wrong idea. Per-class measurement shows signs run
+  /// from 1.02s (TWO) to 2.67s (NO); 1400ms is merely the median, so it padded
+  /// short signs with idle frames and truncated long ones — GOOD MORNING (1.88s,
+  /// two movements) was cut mid-sign, which is why it had to be signed in two
+  /// halves to register. Words are now segmented on hand presence instead; see
+  /// [_decideWord].
+  static const int windowMedianMs = 1400;
 
   static final List<_TimedFrame> _frameBuffer = [];
   static String _lastLabel = '';
@@ -124,6 +190,57 @@ class InferenceService {
   /// Emits periodic landmark diagnostics from the Kotlin side (logcat tag
   /// "MediaPipe"), useful for confirming handedness on a real device.
   static bool debugLogging = kDebugMode;
+
+  /// Raw landmark vector from the last processed frame, before canonicalisation
+  /// or normalisation — i.e. still in the coordinates MediaPipe reported. Used
+  /// only by the debug skeleton overlay.
+  static List<double>? lastRawLandmarks;
+
+  /// Source frame dimensions and rotation for the last processed frame, needed
+  /// to map canvas coordinates back onto the preview.
+  static int lastSrcWidth = 0;
+  static int lastSrcHeight = 0;
+  static int lastRotation = 270;
+
+  /// Draw the detected landmarks over the camera preview.
+  static bool showSkeleton = false;
+
+  /// Canvas size used on the Kotlin side. MUST match CANVAS_W / CANVAS_H in
+  /// MainActivity.kt — the overlay mapping is derived from these.
+  static const double canvasW = 480;
+  static const double canvasH = 360;
+
+  /// Maps a landmark from canvas-normalised space onto the preview widget,
+  /// returning null when the point is empty (no detection).
+  ///
+  /// Kotlin letterboxes the upright frame into a fixed 4:3 canvas, so the
+  /// signer occupies only part of it. This undoes that boxing, then accounts
+  /// for the preview being mirrored for the front camera while the analysis
+  /// frame may not be (words runs unmirrored).
+  static Offset? overlayPoint(double cx, double cy) {
+    if (cx == 0.0 && cy == 0.0) return null;
+    if (lastSrcWidth == 0 || lastSrcHeight == 0) return null;
+
+    // Rotation by 90 or 270 swaps the frame's dimensions.
+    final rotated = lastRotation == 90 || lastRotation == 270;
+    final upW = (rotated ? lastSrcHeight : lastSrcWidth).toDouble();
+    final upH = (rotated ? lastSrcWidth : lastSrcHeight).toDouble();
+
+    final scale = math.min(canvasW / upW, canvasH / upH);
+    final dw = upW * scale;
+    final dh = upH * scale;
+    final left = (canvasW - dw) / 2;
+    final top = (canvasH - dh) / 2;
+
+    var x = (cx * canvasW - left) / dw;
+    var y = (cy * canvasH - top) / dh;
+
+    final previewMirrored = CameraService.isFrontCamera;
+    if (previewMirrored != effectiveMirror) x = 1.0 - x;
+
+    if (x < -0.1 || x > 1.1 || y < -0.1 || y > 1.1) return null;
+    return Offset(x, y);
+  }
 
   static bool lastHadHands = false;
   static double processingFps = 0;
@@ -217,7 +334,26 @@ class InferenceService {
 
       final lmList = List<double>.from(raw);
 
+      // Snapshot before canonicalisation/normalisation mutate it — the overlay
+      // needs the coordinates as MediaPipe actually reported them.
+      if (showSkeleton) {
+        lastRawLandmarks = List<double>.from(raw);
+        lastSrcWidth = image.width;
+        lastSrcHeight = image.height;
+        lastRotation = CameraService.sensorOrientation;
+      }
+
       _updateFps();
+
+      // Posture, from the raw pose block before any normalisation. Words only:
+      // fingerspelling is a continuous stream and has no rest position.
+      if (!isLettersMode) {
+        final h = _wristHeight(lmList);
+        postureValid = h != null;
+        if (h != null) postureHeight = h;
+      } else {
+        postureValid = false;
+      }
 
       // Hands present? Checked before normalisation, while the blocks still hold
       // raw detector output.
@@ -263,15 +399,24 @@ class InferenceService {
       }
 
       if (!hasHands) {
-        // Dropping a frame per miss was fatal at ~2.5 fps: MediaPipe loses the
-        // hand often enough that the buffer drained faster than it filled and the
-        // window never closed ("can't finish taking frames"). Tolerate a short
-        // run of misses, and only discard the gesture once the hand is really gone.
         _missStreak++;
+
+        // WORDS: hands leaving frame ends the sign. Decide once, on everything
+        // that was actually signed, instead of guessing continuously.
+        if (!isLettersMode &&
+            _missStreak >= wordEndSilenceFrames &&
+            _frameBuffer.length >= wordMinFrames) {
+          final decided = _decideWord(DateTime.now());
+          _frameBuffer.clear();
+          if (decided != null) return decided;
+        }
+
         if (_missStreak >= _missesBeforeClear) {
           _frameBuffer.clear();
         }
-        debugString = "> No hands detected ($_missStreak)";
+        debugString = _missStreak >= _missesBeforeClear
+            ? "> Ready — sign, then lower your hands"
+            : "> No hands detected ($_missStreak)";
         return null;
       }
       _missStreak = 0;
@@ -296,19 +441,55 @@ class InferenceService {
                   "($votes/$letterVotesRequired)";
         }
       } else {
-        final sequence = _resampleWindow();
-        if (sequence != null) {
-          result = _runFSL105Inference(sequence);
-          if (result != null) {
-            debugString =
-                "> WORDS: ${result.label} (${result.confidencePercent})";
+        if (postureValid) {
+          // Posture gating. Entry is a single crossing; exit must persist, so a
+          // sign that dips to waist height mid-gesture is not cut in two.
+          if (!_signing) {
+            if (postureHeight > postureEnter) {
+              _signing = true;
+              _belowExitStreak = 0;
+              // Drop anything buffered while at rest.
+              final last = _frameBuffer.last;
+              _frameBuffer
+                ..clear()
+                ..add(last);
+            } else {
+              _frameBuffer.clear();
+              debugString = "> Ready — raise your hands to sign "
+                  "(${postureHeight.toStringAsFixed(1)})";
+              return null;
+            }
+          } else {
+            _belowExitStreak =
+                postureHeight < postureExit ? _belowExitStreak + 1 : 0;
+            if (_belowExitStreak >= postureExitFrames) {
+              _signing = false;
+              _belowExitStreak = 0;
+              if (_frameBuffer.length >= wordMinFrames) {
+                final decided = _decideWord(now);
+                _frameBuffer.clear();
+                if (decided != null) return decided;
+              }
+              _frameBuffer.clear();
+              debugString = "> Ready — raise your hands to sign";
+              return null;
+            }
           }
+        }
+
+        // Still signing (or posture unavailable, in which case hands leaving
+        // frame is the only end signal). Classify anyway past the time cap.
+        final spanMs = _frameBuffer.last.t - _frameBuffer.first.t;
+        if (spanMs >= wordMaxDurationMs && _frameBuffer.length >= wordMinFrames) {
+          _signing = false;
+          _belowExitStreak = 0;
+          final decided = _decideWord(now);
+          _frameBuffer.clear();
+          if (decided != null) return decided;
         } else {
-          final spanMs = _frameBuffer.isEmpty
-              ? 0
-              : _frameBuffer.last.t - _frameBuffer.first.t;
-          debugString =
-              "> Collecting motion... (${spanMs}ms / ${windowMs}ms)";
+          debugString = "> Signing... (${(spanMs / 1000).toStringAsFixed(1)}s, "
+              "${_frameBuffer.length} frames) — "
+              "${postureValid ? 'lower your hands when done' : 'move hands out of frame when done'}";
         }
       }
 
@@ -319,6 +500,10 @@ class InferenceService {
         if (isNewResult && result.confidence >= confidenceThreshold) {
           _lastLabel = result.label;
           _lastResultTime = now;
+          // Machine-readable so an accuracy run can be tallied from logcat
+          // instead of transcribed by hand.
+          debugPrint('RESULT|${isLettersMode ? "L" : "W"}|${result.label}|'
+              '${result.confidence.toStringAsFixed(3)}');
           return result;
         }
       }
@@ -448,49 +633,18 @@ class InferenceService {
     _lastFrameTime = nowMs;
   }
 
-  /// Drops samples that can no longer contribute to the window, keeping a little
-  /// slack so there is always an anchor at or before the window st
+  /// Caps the buffer at [wordMaxDurationMs] so a signer who leaves their hands
+  /// up indefinitely does not grow it without bound.
+  ///
+  /// This used to trim to 1.9s, which would have silently
+  /// truncated any sign longer than that — NO runs 2.67s — discarding its
+  /// opening before classification.
   static void _pruneBuffer() {
     if (_frameBuffer.isEmpty) return;
-    final cutoff = _frameBuffer.last.t - windowMs - 500;
+    final cutoff = _frameBuffer.last.t - wordMaxDurationMs;
     while (_frameBuffer.length > 1 && _frameBuffer.first.t < cutoff) {
       _frameBuffer.removeAt(0);
     }
-  }
-
-  /// Resamples the buffer onto [sequenceLength] evenly spaced points covering the
-  /// most recent [windowMs]. Returns null until the buffer actually spans that
-  /// window. Nearest-neighbour, since landmark vectors are not safe to blend
-  /// across a frame where a hand appeared or vanished.
-  static List<List<double>>? _resampleWindow() {
-    if (_frameBuffer.length < 2) return null;
-
-    final endT = _frameBuffer.last.t;
-    final startT = endT - windowMs;
-    if (_frameBuffer.first.t > startT) return null;
-
-    final out = <List<double>>[];
-    int cursor = 0;
-
-    for (int i = 0; i < sequenceLength; i++) {
-      final target = startT + (windowMs * i / (sequenceLength - 1)).round();
-
-      while (cursor + 1 < _frameBuffer.length &&
-          _frameBuffer[cursor + 1].t <= target) {
-        cursor++;
-      }
-
-      var best = _frameBuffer[cursor];
-      if (cursor + 1 < _frameBuffer.length) {
-        final next = _frameBuffer[cursor + 1];
-        if ((next.t - target).abs() < (best.t - target).abs()) {
-          best = next;
-        }
-      }
-      out.add(best.data);
-    }
-
-    return out;
   }
 
   static TranslationResult? _runFSL105Inference(List<List<double>> sequence) {
@@ -518,6 +672,49 @@ class InferenceService {
       debugPrint('FSL-105 inference error: $e');
     }
     return null;
+  }
+
+  /// Classifies one complete sign attempt: everything buffered between the
+  /// hands entering and leaving frame, resampled to [sequenceLength].
+  ///
+  /// This replaces the old fixed fixed window. Measured sign lengths in
+  /// FSL-105 range from 1.02s (TWO) to 2.67s (NO), so no single window fits:
+  /// a 1400ms window truncated GOOD MORNING (1.88s, two movements) mid-sign
+  /// while padding TWO with idle frames. Segmenting on hand presence also
+  /// matches how the training clips were built — hand-present frames only,
+  /// resampled to 30 — and yields one answer per sign instead of a continuous
+  /// stream of guesses.
+  static TranslationResult? _decideWord(DateTime now) {
+    if (_frameBuffer.length < wordMinFrames) return null;
+
+    final idx = List<int>.generate(
+      sequenceLength,
+      (i) => ((_frameBuffer.length - 1) * i / (sequenceLength - 1)).round(),
+    );
+    final sequence = [for (final i in idx) _frameBuffer[i].data];
+
+    final result = _runFSL105Inference(sequence);
+    if (result == null) {
+      debugString = "> Could not read that sign";
+      return null;
+    }
+
+    final spanMs = _frameBuffer.last.t - _frameBuffer.first.t;
+    if (result.confidence < confidenceThreshold) {
+      debugString = "> Unsure — ${result.label} "
+          "(${result.confidencePercent}, ${(spanMs / 1000).toStringAsFixed(1)}s)";
+      return null;
+    }
+    debugString = "> WORDS: ${result.label} (${result.confidencePercent})";
+
+    // Bypass the repeat-suppression used for the continuous letter stream: each
+    // sign attempt here is a deliberate act, so signing the same word twice
+    // should report twice.
+    _lastLabel = result.label;
+    _lastResultTime = now;
+    debugPrint('RESULT|W|${result.label}|'
+        '${result.confidence.toStringAsFixed(3)}|${spanMs}ms');
+    return result;
   }
 
   /// Majority vote over recent frames, so a letter is only announced once
@@ -599,6 +796,8 @@ class InferenceService {
   static void clearBuffer() {
     _frameBuffer.clear();
     _letterVotes.clear();
+    _signing = false;
+    _belowExitStreak = 0;
     _lastLabel = '';
     _lastFrameTime = 0;
     _missStreak = 0;

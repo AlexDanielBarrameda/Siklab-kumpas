@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
 import '../services/speech_service.dart';
+import '../theme/tokens.dart';
+import '../widgets/app_scaffold.dart';
+import '../widgets/recognition_view.dart';
+import '../widgets/transitions.dart';
+
+/// Tabs in the order they appear in the bottom bar.
+enum _HubTab { camera, voice, text }
 
 class HearingUserScreen extends StatefulWidget {
   const HearingUserScreen({super.key});
@@ -10,20 +17,41 @@ class HearingUserScreen extends StatefulWidget {
 }
 
 class _HearingUserScreenState extends State<HearingUserScreen> {
-  static const _orange = Color(0xFFFF6B00);
-
-  int _selectedTab = 0;
+  _HubTab _tab = _HubTab.voice;
   bool _isListening = false;
+  bool _speedExpanded = true;
   String _textOutput = '';
   final TextEditingController _textController = TextEditingController();
+
   /// Multiplier where 1.0 = natural speaking pace (see SpeechService).
   double _voiceSpeed = SpeechService.speedMultiplier;
+
+  /// Range capped at 1.6x: the engine tops out at its own maximum, so a higher
+  /// ceiling would be a slider that visibly moves without changing anything
+  /// (the old 0.5-2.0 range did exactly that above 1.0). The tick labels below
+  /// the slider therefore read 0.5/0.9/1.2/1.6 rather than the mockup's
+  /// 0.5/1.0/1.5/2.0.
+  static const _speedMin = 0.5;
+  static const _speedMax = 1.6;
+
+  /// Matches TabSwitcher's duration, so the camera does not start spinning up
+  /// while the tab transition is still playing.
+  static const _tabAnimation = Duration(milliseconds: 300);
 
   @override
   void initState() {
     super.initState();
-    SpeechService.initSTT();
-    SpeechService.initTTS();
+    // Speech plugin bring-up is slow enough to swallow the push animation from
+    // Home, which made this screen look like it appeared with no transition at
+    // all. Hold it until the route has settled.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      afterRouteTransition(context, () {
+        if (!mounted) return;
+        SpeechService.initSTT();
+        SpeechService.initTTS();
+      });
+    });
   }
 
   @override
@@ -33,263 +61,88 @@ class _HearingUserScreenState extends State<HearingUserScreen> {
     super.dispose();
   }
 
+  String _modeLine(bool isFilipino) {
+    switch (_tab) {
+      case _HubTab.camera:
+        return isFilipino
+            ? 'FSL → Teksto + Pagsasalita'
+            : 'FSL → Text + Speech';
+      case _HubTab.voice:
+        return isFilipino
+            ? 'Boses → Teksto + FSL Avatar'
+            : 'Voice → Text + FSL Avatar';
+      case _HubTab.text:
+        return isFilipino
+            ? 'Teksto → Pagsasalita + FSL Avatar'
+            : 'Text → Speech + FSL Avatar';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final app = SiklabKumpasApp.of(context);
-    final isDark = app?.isDark ?? true;
+    final c = AppColors.of(app?.isDark ?? true);
     final lang = app?.language ?? 'en';
     final isFilipino = lang == 'fil';
 
-    final bgColor =
-        isDark ? const Color(0xFF0D0D0D) : const Color(0xFFF5F0FF);
-    final cardColor = isDark ? const Color(0xFF1A1A2E) : Colors.white;
-    final textColor = isDark ? Colors.white : const Color(0xFF1A1A2E);
-    final subtitleColor = isDark ? Colors.white54 : Colors.black45;
-    final inputBg =
-        isDark ? const Color(0xFF0D0D0D) : const Color(0xFFF5F5F5);
-
-    return Scaffold(
-      backgroundColor: bgColor,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Icon(Icons.arrow_back_ios_new_rounded,
-                        color: textColor, size: 20),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          isFilipino
-                              ? 'Hub ng Pagsasalin'
-                              : 'Translation Hub',
-                          style: TextStyle(
-                            color: textColor,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Text(
-                          'Real-time 3-Way Communication Bridge',
-                          style: TextStyle(
-                              color: subtitleColor, fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Mode indicator
-            Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                child: Align(
-                  key: ValueKey(_selectedTab),
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    _selectedTab == 0
-                        ? (isFilipino
-                            ? 'Boses → Teksto + FSL Avatar'
-                            : 'Voice → Text + FSL Avatar')
-                        : (isFilipino
-                            ? 'Teksto → Pagsasalita + FSL Avatar'
-                            : 'Text → Speech + FSL Avatar'),
-                    style: const TextStyle(
-                      color: _orange,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            // Content area with fade+slide transition
-            Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 350),
-                transitionBuilder: (child, animation) {
-                  final offsetAnimation = Tween<Offset>(
-                    begin: const Offset(0.08, 0),
-                    end: Offset.zero,
-                  ).animate(CurvedAnimation(
-                    parent: animation,
-                    curve: Curves.easeOutCubic,
-                  ));
-                  return FadeTransition(
-                    opacity: animation,
-                    child: SlideTransition(
-                      position: offsetAnimation,
-                      child: child,
-                    ),
-                  );
-                },
-                child: SingleChildScrollView(
-                  key: ValueKey(_selectedTab),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: _selectedTab == 0
-                      ? _buildVoiceTab(cardColor, textColor,
-                          subtitleColor, lang, isFilipino)
-                      : _buildTextTab(cardColor, textColor,
-                          subtitleColor, inputBg, isFilipino),
-                ),
-              ),
-            ),
-
-            // Bottom tab bar
-            Container(
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: cardColor,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                children: [
-                  _TabButton(
-                    icon: Icons.mic_rounded,
-                    label: isFilipino ? 'Boses' : 'Voice',
-                    isSelected: _selectedTab == 0,
-                    onTap: () => setState(() => _selectedTab = 0),
-                  ),
-                  _TabButton(
-                    icon: Icons.text_fields_rounded,
-                    label: isFilipino ? 'Teksto' : 'Text',
-                    isSelected: _selectedTab == 1,
-                    onTap: () => setState(() => _selectedTab = 1),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+    return AppScaffold(
+      showBack: true,
+      title: isFilipino ? 'Hub ng Pagsasalin' : 'Translation Hub',
+      subtitle: isFilipino
+          ? 'Real-time na Tulay sa 3-Daang Komunikasyon'
+          : 'Real-time 3-Way Communication Bridge',
+      modeLine: _modeLine(isFilipino),
+      child: Column(
+        children: [
+          Expanded(child: _buildBody(c, lang, isFilipino)),
+          _buildTabBar(c, isFilipino),
+        ],
       ),
     );
   }
 
-  Widget _buildVoiceTab(
-    Color cardColor,
-    Color textColor,
-    Color subtitleColor,
-    String lang,
-    bool isFilipino,
-  ) {
+  Widget _buildBody(AppColors c, String lang, bool isFilipino) {
+    // One transition covers all three tabs. TabSwitcher animates the incoming
+    // child only and drops the outgoing one immediately, which is what lets the
+    // camera tab take part: an AnimatedSwitcher would keep a disposing
+    // RecognitionView alive through the cross-fade, and that copy tearing down
+    // the global CameraService could kill a camera the new copy had just
+    // started.
+    return TabSwitcher(
+      tabKey: _tab,
+      child: _tab == _HubTab.camera
+          ? Padding(
+              key: const ValueKey(_HubTab.camera),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: RecognitionView(
+                isFilipino: isFilipino,
+                initDelay: _tabAnimation,
+              ),
+            )
+          : SingleChildScrollView(
+              key: ValueKey(_tab),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: _tab == _HubTab.voice
+                  ? _buildVoiceTab(c, lang, isFilipino)
+                  : _buildTextTab(c, isFilipino),
+            ),
+    );
+  }
+
+  // ---------------------------------------------------------------- voice tab
+
+  Widget _buildVoiceTab(AppColors c, String lang, bool isFilipino) {
     return Column(
       children: [
-        // Avatar placeholder
-        Container(
-          width: double.infinity,
-          height: 220,
-          decoration: BoxDecoration(
-            color: cardColor,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 100,
-                height: 100,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF6C63FF),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.back_hand_rounded,
-                    color: Colors.white, size: 48),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                '3D FSL Avatar',
-                style: TextStyle(color: subtitleColor, fontSize: 14),
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 20),
-
-        // Mic button
-        GestureDetector(
-          onTap: () async {
-            final available = await SpeechService.initSTT();
-            if (!available) {
-              setState(() => _textOutput = 'Speech recognition not available on this device');
-              return;
-            }
-
-            if (_isListening) {
-              await SpeechService.stopListening();
-              setState(() => _isListening = false);
-            } else {
-              setState(() {
-                _isListening = true;
-                _textOutput = 'Listening...';
-              });
-              await SpeechService.startListening(
-                lang: lang,
-                onResult: (text) {
-                  setState(() {
-                    _textOutput = text;
-                    _isListening = false;
-                  });
-                  SpeechService.speak(text);
-                },
-              );
-            }
-          },
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              color: _isListening
-                  ? _orange.withValues(alpha: 0.2)
-                  : cardColor,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: _isListening ? _orange : Colors.transparent,
-                width: 2,
-              ),
-            ),
-            child: Icon(
-              _isListening
-                  ? Icons.mic_rounded
-                  : Icons.mic_none_rounded,
-              color: _isListening ? _orange : textColor,
-              size: 32,
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 20),
-
-        // Text output box
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: cardColor,
-            borderRadius: BorderRadius.circular(16),
-          ),
+        // Output first, matching UI.3 — the hearing user reads this, so it sits
+        // above the avatar rather than below it.
+        AppCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 isFilipino ? 'Output ng Teksto:' : 'Text Output:',
-                style: TextStyle(color: subtitleColor, fontSize: 12),
+                style: TextStyle(color: c.subtitle, fontSize: 12),
               ),
               const SizedBox(height: 8),
               Text(
@@ -299,171 +152,135 @@ class _HearingUserScreenState extends State<HearingUserScreen> {
                         : 'Press microphone to start')
                     : _textOutput,
                 style: TextStyle(
-                  color: _textOutput.isEmpty ? subtitleColor : textColor,
-                  fontSize: 15,
+                  color: _textOutput.isEmpty ? c.subtitle : c.text,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],
           ),
         ),
-
         const SizedBox(height: 16),
+        _avatarCard(
+          c,
+          height: 210,
+          label: isFilipino ? '3D FSL Avatar' : '3D FSL Avatar',
+          puck: 100,
+        ),
+        const SizedBox(height: 20),
+        _buildMicButton(c, lang, isFilipino),
+        const SizedBox(height: 8),
       ],
     );
   }
 
-  Widget _buildTextTab(
-    Color cardColor,
-    Color textColor,
-    Color subtitleColor,
-    Color inputBg,
-    bool isFilipino,
-  ) {
+  Widget _buildMicButton(AppColors c, String lang, bool isFilipino) {
+    return GestureDetector(
+      onTap: () async {
+        final available = await SpeechService.initSTT();
+        if (!available) {
+          setState(() => _textOutput =
+              'Speech recognition not available on this device');
+          return;
+        }
+
+        if (_isListening) {
+          await SpeechService.stopListening();
+          setState(() => _isListening = false);
+        } else {
+          setState(() {
+            _isListening = true;
+            _textOutput = 'Listening...';
+          });
+          await SpeechService.startListening(
+            lang: lang,
+            onResult: (text) {
+              setState(() {
+                _textOutput = text;
+                _isListening = false;
+              });
+              SpeechService.speak(text);
+            },
+          );
+        }
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 76,
+        height: 76,
+        decoration: BoxDecoration(
+          color: _isListening ? c.orange.withValues(alpha: 0.2) : c.surface,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: _isListening ? c.orange : c.border,
+            width: _isListening ? 2 : 1,
+          ),
+        ),
+        child: Icon(
+          _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
+          color: _isListening ? c.orange : c.text,
+          size: 34,
+        ),
+      ),
+    );
+  }
+
+  // ----------------------------------------------------------------- text tab
+
+  Widget _buildTextTab(AppColors c, bool isFilipino) {
     return Column(
       children: [
-        // Voice speed
-        Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: cardColor,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.volume_up_rounded,
-                  color: _orange, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                isFilipino ? 'Bilis ng Boses' : 'Voice Speed',
-                style: TextStyle(color: textColor, fontSize: 14),
-              ),
-              const Spacer(),
-              Text(
-                '${_voiceSpeed.toStringAsFixed(2)}x',
-                style: const TextStyle(
-                  color: _orange,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 8),
-
-        // Speed slider
-        // Range capped at 1.6x: the engine tops out at its own maximum, so a
-        // higher ceiling would be a slider that visibly moves without changing
-        // anything (the old 0.5-2.0 range did exactly that above 1.0).
-        Slider(
-          value: _voiceSpeed,
-          min: 0.5,
-          max: 1.6,
-          divisions: 11,
-          activeColor: _orange,
-          inactiveColor: _orange.withValues(alpha: 0.2),
-          onChanged: (v) => setState(() {
-            _voiceSpeed = v;
-            SpeechService.speedMultiplier = v;
-          }),
-        ),
-
-        const SizedBox(height: 8),
-
-        // Text input
-        Container(
-          decoration: BoxDecoration(
-            color: cardColor,
-            borderRadius: BorderRadius.circular(16),
-          ),
+        AppCard(
+          padding: EdgeInsets.zero,
           child: TextField(
             controller: _textController,
             maxLines: 4,
-            style: TextStyle(color: textColor, fontSize: 15),
+            style: TextStyle(color: c.text, fontSize: 15),
             decoration: InputDecoration(
               hintText: isFilipino
                   ? 'I-type ang iyong mensahe dito...'
                   : 'Type your message here...',
-              hintStyle:
-                  TextStyle(color: textColor.withValues(alpha: 0.3)),
+              hintStyle: TextStyle(color: c.text.withValues(alpha: 0.35)),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.all(16),
             ),
           ),
         ),
-
-        const SizedBox(height: 16),
-
-        // Avatar placeholder
-        Container(
-          width: double.infinity,
-          height: 200,
-          decoration: BoxDecoration(
-            color: cardColor,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 90,
-                height: 90,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF6C63FF),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.back_hand_rounded,
-                    color: Colors.white, size: 44),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                isFilipino
-                    ? 'Output ng FSL Avatar'
-                    : 'FSL Avatar Output',
-                style: TextStyle(color: subtitleColor, fontSize: 14),
-              ),
-            ],
-          ),
+        const SizedBox(height: 14),
+        _buildVoiceSpeed(c, isFilipino),
+        const SizedBox(height: 14),
+        _avatarCard(
+          c,
+          height: 190,
+          label: isFilipino ? 'Output ng FSL Avatar' : 'FSL Avatar Output',
+          puck: 90,
         ),
-
-        const SizedBox(height: 16),
-
-        // Speech output status
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: cardColor,
-            borderRadius: BorderRadius.circular(16),
-          ),
+        const SizedBox(height: 14),
+        AppCard(
           child: Row(
             children: [
               Text(
-                isFilipino
-                    ? 'Output ng Pagsasalita:'
-                    : 'Speech Output:',
-                style: TextStyle(color: subtitleColor, fontSize: 12),
+                isFilipino ? 'Output ng Pagsasalita:' : 'Speech Output:',
+                style: TextStyle(color: c.subtitle, fontSize: 12),
               ),
-              const SizedBox(width: 8),
-              const Icon(Icons.circle, color: Colors.green, size: 10),
-              const SizedBox(width: 4),
+              const SizedBox(width: 10),
+              const Icon(Icons.circle, color: Color(0xFF28C840), size: 9),
+              const SizedBox(width: 5),
               Text(
                 isFilipino ? 'Handa na ang audio' : 'Audio ready',
                 style: const TextStyle(
-                    color: Colors.green, fontSize: 13),
+                  color: Color(0xFF28C840),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
         ),
-
-        const SizedBox(height: 16),
-
-        // Convert button
+        const SizedBox(height: 14),
         SizedBox(
           width: double.infinity,
-          height: 56,
+          height: 54,
           child: ElevatedButton(
             onPressed: () {
               final text = _textController.text.trim();
@@ -472,24 +289,201 @@ class _HearingUserScreenState extends State<HearingUserScreen> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: _orange,
+              backgroundColor: c.orange,
               foregroundColor: Colors.white,
+              elevation: 0,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(32),
+                borderRadius: BorderRadius.circular(16),
               ),
             ),
             child: Text(
               isFilipino
                   ? 'I-convert sa Pagsasalita + FSL'
                   : 'Convert to Speech + FSL',
-              style: const TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.w700),
+              style:
+                  const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
             ),
           ),
         ),
-
-        const SizedBox(height: 16),
+        const SizedBox(height: 8),
       ],
+    );
+  }
+
+  /// Collapsible speed control: starts expanded showing the slider, collapses
+  /// to just the header row when the header is tapped.
+  Widget _buildVoiceSpeed(AppColors c, bool isFilipino) {
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => setState(() => _speedExpanded = !_speedExpanded),
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  Icon(Icons.volume_up_rounded, color: c.orange, size: 20),
+                  const SizedBox(width: 10),
+                  Text(
+                    isFilipino ? 'Bilis ng Boses' : 'Voice Speed',
+                    style: TextStyle(
+                      color: c.text,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${_voiceSpeed.toStringAsFixed(2)}x',
+                    style: TextStyle(
+                      color: c.orange,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  AnimatedRotation(
+                    turns: _speedExpanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(Icons.keyboard_arrow_down_rounded,
+                        color: c.subtitle, size: 22),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 220),
+            sizeCurve: Curves.easeOutCubic,
+            crossFadeState: _speedExpanded
+                ? CrossFadeState.showFirst
+                : CrossFadeState.showSecond,
+            firstChild: Column(
+              children: [
+                Divider(height: 1, color: c.border),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+                  child: Column(
+                    children: [
+                      SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          trackHeight: 5,
+                          overlayShape: const RoundSliderOverlayShape(
+                              overlayRadius: 16),
+                        ),
+                        child: Slider(
+                          value: _voiceSpeed,
+                          min: _speedMin,
+                          max: _speedMax,
+                          divisions: 11,
+                          onChanged: (v) => setState(() {
+                            _voiceSpeed = v;
+                            SpeechService.speedMultiplier = v;
+                          }),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: ['0.5x', '0.9x', '1.2x', '1.6x']
+                              .map((t) => Text(
+                                    t,
+                                    style: TextStyle(
+                                        color: c.subtitle, fontSize: 11),
+                                  ))
+                              .toList(),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            secondChild: const SizedBox(width: double.infinity),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ------------------------------------------------------------------ shared
+
+  Widget _avatarCard(
+    AppColors c, {
+    required double height,
+    required String label,
+    required double puck,
+  }) {
+    return AppCard(
+      gradient: c.avatarCard,
+      padding: EdgeInsets.zero,
+      radius: 20,
+      child: SizedBox(
+        height: height,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: puck,
+              height: puck,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF7C5CFF), Color(0xFF5B4BFF)],
+                ),
+              ),
+              child: Icon(Icons.back_hand_rounded,
+                  color: Colors.white, size: puck * 0.48),
+            ),
+            const SizedBox(height: 14),
+            Text(label, style: TextStyle(color: c.subtitle, fontSize: 14)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTabBar(AppColors c, bool isFilipino) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: c.border),
+      ),
+      child: Row(
+        children: [
+          _TabButton(
+            icon: Icons.photo_camera_outlined,
+            label: isFilipino ? 'Kamera' : 'Camera',
+            isSelected: _tab == _HubTab.camera,
+            colors: c,
+            onTap: () => setState(() => _tab = _HubTab.camera),
+          ),
+          _TabButton(
+            icon: Icons.mic_none_rounded,
+            label: isFilipino ? 'Boses' : 'Voice',
+            isSelected: _tab == _HubTab.voice,
+            colors: c,
+            onTap: () => setState(() => _tab = _HubTab.voice),
+          ),
+          _TabButton(
+            icon: Icons.title_rounded,
+            label: isFilipino ? 'Teksto' : 'Text',
+            isSelected: _tab == _HubTab.text,
+            colors: c,
+            onTap: () => setState(() => _tab = _HubTab.text),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -498,49 +492,46 @@ class _TabButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool isSelected;
+  final AppColors colors;
   final VoidCallback onTap;
 
   const _TabButton({
     required this.icon,
     required this.label,
     required this.isSelected,
+    required this.colors,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final c = colors;
+    final fg = isSelected ? c.orange : c.subtitle;
     return Expanded(
       child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
             color: isSelected
-                ? const Color(0xFFFF6B00).withValues(alpha: 0.15)
+                ? c.orange.withValues(alpha: 0.18)
                 : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
           ),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                icon,
-                color: isSelected
-                    ? const Color(0xFFFF6B00)
-                    : Colors.grey,
-                size: 22,
-              ),
-              const SizedBox(height: 4),
+              Icon(icon, color: fg, size: 22),
+              const SizedBox(height: 5),
               Text(
                 label,
                 style: TextStyle(
-                  color: isSelected
-                      ? const Color(0xFFFF6B00)
-                      : Colors.grey,
+                  color: fg,
                   fontSize: 12,
-                  fontWeight: isSelected
-                      ? FontWeight.w600
-                      : FontWeight.w400,
+                  fontWeight:
+                      isSelected ? FontWeight.w600 : FontWeight.w400,
                 ),
               ),
             ],
