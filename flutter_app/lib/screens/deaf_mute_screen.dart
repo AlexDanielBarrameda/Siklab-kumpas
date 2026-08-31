@@ -6,7 +6,40 @@ import '../main.dart';
 import '../services/speech_service.dart';
 import '../theme/tokens.dart';
 import '../widgets/app_scaffold.dart';
+import '../widgets/onboarding_tour.dart';
+import '../widgets/transitions.dart';
 import '../widgets/recognition_view.dart';
+
+/// A quick message: what the screen shows, and what the engine is given.
+///
+/// The two are allowed to differ because Android's TTS spells any token it
+/// cannot find in its lexicon, and the words that matter most here — "Pipe",
+/// "pakikipag-usap" — are exactly the ones an ENGLISH lexicon does not
+/// contain. The same display/spoken split already exists for fingerspelled
+/// words in InferenceService, for the same reason.
+class QuickMessage {
+  /// Shown on screen. Always the correctly spelled sentence.
+  final String display;
+
+  /// Respelled so an English voice pronounces it. Null when none is needed.
+  final String? englishVoiceForm;
+
+  const QuickMessage(this.display, [this.englishVoiceForm]);
+
+  /// What to hand the engine, given the voice actually in use.
+  ///
+  /// The respelling applies ONLY when the engine has fallen back to English. A
+  /// Filipino voice reads "Pipe" correctly on its own, and feeding it "Pee-peh"
+  /// would make it worse — so the override is scoped exactly to the case that
+  /// needs it, rather than applied unconditionally.
+  String spokenFor(String ttsLanguage) {
+    final l = ttsLanguage.toLowerCase();
+    final filipinoVoice = l.startsWith('fil') || l.startsWith('tl');
+    return (!filipinoVoice && englishVoiceForm != null)
+        ? englishVoiceForm!
+        : display;
+  }
+}
 
 class DeafMuteScreen extends StatefulWidget {
   const DeafMuteScreen({super.key});
@@ -27,20 +60,41 @@ class _DeafMuteScreenState extends State<DeafMuteScreen> {
   bool _signalCollapsed = false;
   Timer? _collapseTimer;
 
-  final List<String> _preRecordedEn = [
-    'None',
-    'Hello, can I talk to you?',
-    'Excuse me, may I have a moment?',
-    'Hi, can you help me with something?',
-    'Good day! Can we have a conversation?',
+  final List<QuickMessage> _preRecordedEn = const [
+    QuickMessage('None'),
+    // First after None, and deliberately so.
+    //
+    // This is the one thing whose whole purpose is to be SPOKEN at a hearing
+    // stranger, and the situation it is for is the worst one to fail in. A
+    // button says it in one tap every time; routing it through sign
+    // recognition would put the model and the confidence gate between the
+    // user and the sentence they most need to land.
+    QuickMessage("I'm Deaf. I communicate through sign language."),
+    QuickMessage("I'm Mute. I communicate through sign language."),
+    QuickMessage('Hello, can I talk to you?'),
+    QuickMessage('Excuse me, may I have a moment?'),
+    QuickMessage('Hi, can you help me with something?'),
+    QuickMessage('Good day! Can we have a conversation?'),
   ];
 
-  final List<String> _preRecordedFil = [
-    'Wala',
-    'Kumusta, maari ka bang makausap?',
-    'Pasensya na, maari po bang makahingi ng sandali?',
-    'Hi, maari mo ba akong tulungan?',
-    'Magandang araw! Maari ba tayong mag-usap?',
+  final List<QuickMessage> _preRecordedFil = const [
+    QuickMessage('Wala'),
+    QuickMessage(
+      'Bingi po ako. Sign language po ang paraan ko ng pakikipag-usap.',
+      // The hyphen is what an English voice reads as a break before an unknown
+      // token, which is how "usap" came out spelled letter by letter.
+      'Bingi po ako. Sign language po ang paraan ko ng pakikipag oosap.',
+    ),
+    QuickMessage(
+      'Pipe po ako. Sign language po ang paraan ko ng pakikipag-usap.',
+      // "Pipe" is an English word, so an English voice says /paip/ with total
+      // confidence. Two syllables have to be spelled into it.
+      'Pee-peh po ako. Sign language po ang paraan ko ng pakikipag oosap.',
+    ),
+    QuickMessage('Kumusta, maari ka bang makausap?'),
+    QuickMessage('Pasensya na, maari po bang makahingi ng sandali?'),
+    QuickMessage('Hi, maari mo ba akong tulungan?'),
+    QuickMessage('Magandang araw! Maari ba tayong mag-usap?'),
   ];
 
   @override
@@ -48,6 +102,20 @@ class _DeafMuteScreenState extends State<DeafMuteScreen> {
     super.initState();
     _collapseTimer = Timer(_collapseAfter, () {
       if (mounted) setState(() => _signalCollapsed = true);
+    });
+    // First run only. Held until the push animation has settled, or the dialog
+    // appears mid-transition and the screen behind it is still sliding.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      afterRouteTransition(context, () {
+        if (!mounted) return;
+        final app = SiklabKumpasApp.of(context);
+        OnboardingTour.maybeShow(
+          context,
+          TourId.initiator,
+          (app?.language ?? 'en') == 'fil',
+        );
+      });
     });
   }
 
@@ -75,12 +143,13 @@ class _DeafMuteScreenState extends State<DeafMuteScreen> {
     final isFilipino = (app?.language ?? 'en') == 'fil';
 
     return AppScaffold(
+      helpTour: TourId.initiator,
       showBack: true,
       title: isFilipino ? 'Modong Tagapagsimula' : 'Initiator Mode',
       subtitle: isFilipino ? 'Bingi / Pipi POV' : 'Deaf / Mute POV',
       modeLine: isFilipino
-          ? 'FSL → Teksto + Pagsasalita'
-          : 'FSL → Text + Speech Conversion',
+          ? 'Sign Language → Teksto + Pagsasalita'
+          : 'Sign Language → Text + Speech',
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
         // The signal button floats over the scrolling content instead of
@@ -234,7 +303,7 @@ class _SignalButtonState extends State<_SignalButton>
 
 class _SignalModal extends StatefulWidget {
   final bool isFilipino;
-  final List<String> preRecorded;
+  final List<QuickMessage> preRecorded;
 
   const _SignalModal({
     required this.isFilipino,
@@ -409,7 +478,7 @@ class _SignalModalState extends State<_SignalModal> {
                       children: [
                         Expanded(
                           child: Text(
-                            widget.preRecorded[i],
+                            widget.preRecorded[i].display,
                             style: TextStyle(
                               color: isSelected ? c.orange : c.text,
                               fontSize: 14,
@@ -458,8 +527,16 @@ class _SignalModalState extends State<_SignalModal> {
 
                   // Play the audio spiel if not "None" (index 0)
                   if (_selectedMessage > 0) {
-                    SpeechService.setTTSLanguage(isFilipino ? 'fil' : 'en');
-                    SpeechService.speak(widget.preRecorded[_selectedMessage]);
+                    // AWAITED. Both calls are async and neither used to be, so
+                    // setLanguage was still in flight when speak() started —
+                    // the utterance went out on whatever voice was loaded
+                    // before, which is how a Filipino message came out read by
+                    // an English voice, and why "usap" was spelled.
+                    await SpeechService.setTTSLanguage(
+                        isFilipino ? 'fil' : 'en');
+                    final msg = widget.preRecorded[_selectedMessage];
+                    await SpeechService.speak(
+                        msg.spokenFor(SpeechService.ttsLanguage));
                   }
                 },
                 style: ElevatedButton.styleFrom(

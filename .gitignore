@@ -12,6 +12,10 @@ ml_pipeline/data/processed/
 *.h5
 *.keras
 
+# Avatar editing masters. The built clips under
+# flutter_app/assets/avatar/clips/ are committed; these are not.
+avatar_pipeline/masters/
+
 # TFLite models
 *.tflite
 
@@ -23,3 +27,9 @@ flutter_app/.flutter-plugins-dependencies
 
 # VS Code
 .vscode/settings.json
+
+# API keys and secrets — never commit
+.env
+*.env
+!*.env.example
+secrets/

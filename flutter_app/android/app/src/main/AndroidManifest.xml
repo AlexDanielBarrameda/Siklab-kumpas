@@ -41,10 +41,29 @@
             android:value="2"/>
     </application>
 
+    <!--
+        Android 11 (API 30) filters which packages an app can see. Without an
+        entry here the app cannot bind to a text-to-speech engine or a speech
+        recogniser at all, even when one is installed: TextToSpeech fails with
+        "not bound to TTS engine" and SpeechRecognizer reports
+        recognizerNotAvailable, with an AppsFilter ... BLOCKED line in logcat as
+        the only real clue.
+
+        This is invisible on Android 10 and below, where no filtering happens —
+        which is exactly why it reproduced on a HyperOS 3 device while two older
+        test phones were fine. Neither flutter_tts nor speech_to_text declares
+        these, so the app has to.
+    -->
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE"/>
+        </intent>
+        <intent>
+            <action android:name="android.speech.RecognitionService"/>
         </intent>
     </queries>
 

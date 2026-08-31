@@ -71,7 +71,9 @@ class HomeScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 14),
                       _ProfileCard(
-                        title: isFilipino ? 'Gumagamit ng FSL' : 'FSL User',
+                        title: isFilipino
+                            ? 'Gumagamit ng Sign Language'
+                            : 'Sign Language User',
                         caption: isFilipino
                             ? 'Bingi / Pipi'
                             : 'Deaf / Mute Users',

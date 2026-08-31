@@ -1,0 +1,24 @@
+
+model asl_525_best.keras   6,378 test clips
+clean                                  67.69%   <- reference
+
+RELIANCE
+  pose block zeroed                     0.38%
+
+SENSITIVITY — translation (normalised image units)
+  shifted right 0.05                   66.90%
+  shifted down  0.05                   67.31%
+  shifted right 0.10                   65.76%
+  shifted down  0.10                   66.16%
+  shifted right 0.20                   61.23%
+  shifted down  0.20                   60.87%
+
+SENSITIVITY — scale about shoulders (signer nearer / further)
+  pose scaled x0.8                     66.15%
+  pose scaled x1.25                    65.04%
+  pose scaled x1.5                     58.18%
+
+CORPUS BODY GEOMETRY (test split, frames with pose)
+  shoulder width   median 0.391   p10 0.333   p90 0.450
+  shoulder y       median 0.623
+  body centre x    median 0.525   p10 0.470   p90 0.574

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
 import '../theme/tokens.dart';
+import 'onboarding_tour.dart';
 import 'settings_modal.dart';
 import 'theme_ripple.dart';
 
@@ -40,7 +41,13 @@ class AppIconButton extends StatelessWidget {
 
 /// Settings + theme toggle, top right on every screen.
 class AppTopActions extends StatefulWidget {
-  const AppTopActions({super.key});
+  /// Which tour the (?) button reopens. Null hides the button.
+  ///
+  /// Screens that explain themselves — Home, Signal — have no tour, so they
+  /// get no (?) rather than an empty one.
+  final TourId? helpTour;
+
+  const AppTopActions({super.key, this.helpTour});
 
   @override
   State<AppTopActions> createState() => _AppTopActionsState();
@@ -61,6 +68,17 @@ class _AppTopActionsState extends State<AppTopActions> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (widget.helpTour != null) ...[
+          AppIconButton(
+            icon: Icons.help_outline_rounded,
+            onTap: () => OnboardingTour.show(
+              context,
+              widget.helpTour!,
+              (app?.language ?? 'en') == 'fil',
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
         AppIconButton(
           icon: Icons.settings_outlined,
           onTap: () => showSettingsModal(context),
@@ -100,6 +118,9 @@ class AppScaffold extends StatelessWidget {
   /// Orange line under the subtitle, e.g. "Voice -> Text + FSL Avatar".
   final String? modeLine;
 
+  /// Tour the (?) button reopens for this screen.
+  final TourId? helpTour;
+
   /// Trailing widget on the mode line, e.g. the LETTERS/WORDS toggle.
   final Widget? modeLineTrailing;
 
@@ -111,6 +132,7 @@ class AppScaffold extends StatelessWidget {
     this.subtitle,
     this.modeLine,
     this.modeLineTrailing,
+    this.helpTour,
   });
 
   @override
@@ -134,7 +156,7 @@ class AppScaffold extends StatelessWidget {
                         onTap: () => Navigator.pop(context),
                       ),
                     const Spacer(),
-                    const AppTopActions(),
+                    AppTopActions(helpTour: helpTour),
                   ],
                 ),
               ),

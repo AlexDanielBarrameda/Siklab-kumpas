@@ -1,6 +1,9 @@
 package com.siklabkumpas.siklab_kumpas
 
+import android.app.Activity
 import android.content.Context
+import android.content.Intent
+import android.speech.RecognizerIntent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -91,6 +94,71 @@ class MainActivity : FlutterActivity() {
     private var boxTop = 0f
     private var boxScale = 1f
 
+    /**
+     * Signer-tracking crop.
+     *
+     * Letterboxing an upright portrait frame into the 4:3 canvas spends ~44% of
+     * the width on black bars and leaves the signer small. Measured on a Redmi
+     * Turbo 4 Pro against the training corpus:
+     *
+     *     shoulder width   corpus 0.417   device 0.19-0.24
+     *     hand span        corpus 0.271   device 0.10-0.15
+     *
+     * The features are scale-invariant, so distance alone is harmless -- but a
+     * ~48px hand is below what the landmarker resolves well, and it compresses
+     * the detected hand toward an average shape. The measured symptom is that
+     * inter-hand offset divided by hand span reads 7.17 on device against 2.88
+     * in the corpus, which puts the hand_loc block 21.5% outside the corpus
+     * range and drags velocity and acceleration with it.
+     *
+     * So instead of shrinking the signer to fit, crop to them. The crop is
+     * sized from the last pose so their shoulders land near the corpus
+     * proportion, and centred on the shoulder midpoint.
+     */
+    private var signerCx = -1f          // canvas-normalised shoulder midpoint
+    private var signerCy = -1f
+    private var signerShoulder = -1f    // canvas-normalised shoulder width
+    private var cropCx = -1f            // smoothed crop centre, upright pixels
+    private var cropCy = -1f
+    private var cropW = -1f             // smoothed crop width, upright pixels
+
+    /** Corpus median shoulder width, as a fraction of canvas width. */
+    private val TARGET_SHOULDER = 0.40f
+    /** How fast the crop follows the signer. Low so framing does not jitter. */
+    private val CROP_SMOOTH = 0.15f
+
+    /**
+     * Consecutive frames on which pose has failed to locate the signer.
+     *
+     * Losing the signer used to set signerShoulder = -1f and nothing else,
+     * which stopped the crop being UPDATED but left cropW/cropCx/cropCy at
+     * their last values -- so the crop went on drawing the same stale region
+     * indefinitely. Since pose then runs on that stale crop, a signer who has
+     * moved out of it can never be found again, and the failure sustains
+     * itself: no pose, so no new crop, so no pose.
+     *
+     * Measured on device from the diagnostic trace: two dead spells of 28s and
+     * 43s in one session and 90s in the next, each ending abruptly when the
+     * signer happened to line back up with the frozen box. Frame rate was
+     * NORMAL throughout -- in fact higher during the dead spells (15.6 fps
+     * against ~10.5 while working), because an empty crop is cheap to process.
+     * Letters mode never showed the fault because it clears cropW every frame.
+     */
+    private var signerLostFrames = 0
+
+    /**
+     * Losses tolerated before the crop starts opening up.
+     *
+     * Pose blinks for a single frame routinely -- hands crossing the face,
+     * motion blur -- and widening on those would perturb the framing mid-sign,
+     * which is a model input. Below this the behaviour is byte-identical to
+     * before; only a SUSTAINED loss triggers recovery.
+     */
+    private val CROP_GRACE_FRAMES = 3
+
+    /** How fast a lost crop opens back out, per frame. */
+    private val CROP_RELAX = 1.18f
+
     // Cached reflective accessor for pose visibility (MediaPipe 0.10.0 exposes it
     // inconsistently across builds). Looked up once instead of 25x per frame.
     private var visibilityMethod: Method? = null
@@ -98,17 +166,85 @@ class MainActivity : FlutterActivity() {
 
     private var frameCounter = 0L
 
+    /** Pending reply for [listenViaActivity], answered in onActivityResult. */
+    private var speechResult: MethodChannel.Result? = null
+    private val SPEECH_REQUEST = 4711
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == SPEECH_REQUEST) {
+            val pending = speechResult
+            speechResult = null
+            if (pending != null) {
+                val text = if (resultCode == Activity.RESULT_OK && data != null) {
+                    data.getStringArrayListExtra(
+                        RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+                } else {
+                    null
+                }
+                // null means cancelled or heard nothing; the Dart side treats
+                // that as "try again" rather than as an error.
+                pending.success(text)
+            }
+            return
+        }
+        super.onActivityResult(requestCode, resultCode, data)
+    }
+
     /**
-     * Pose is the most expensive model in the pipeline and the body moves far more
-     * slowly than the hands, so it runs every Nth frame and the previous result is
-     * reused in between. The word buffer is resampled onto a fixed time window
-     * anyway, so slightly stale pose costs far less than the frames we'd lose.
+     * Pose runs on EVERY frame, concurrently with the hand work.
+     *
+     * It was previously cached and reused across 3 frames, on the reasoning that
+     * the body moves slowly. That was wrong: the pose block carries the WRISTS,
+     * so caching left hand position stale by up to 0.4s — and FATHER vs MOTHER
+     * are distinguished *only* by hand height relative to the face. Zeroing pose
+     * drops FATHER to 0% accuracy, so a lagged pose blurred precisely the signal
+     * those signs depend on; MOTHER never appeared once in a 34-sign trace.
+     *
+     * Running it every frame would have cost ~1.3 fps sequentially. Running it
+     * on its own thread costs almost nothing instead, since the frame budget
+     * becomes max(hand, pose) rather than hand + pose.
      */
-    // Measured at 116-176ms per run on this device, so it is worth amortising
-    // further. The word buffer is resampled onto a 1s window regardless.
-    private val POSE_EVERY_N = 3
-    private var cachedPose = FloatArray(100)
-    private var cachedPoseFrame = -1L
+    private val poseExecutor: ExecutorService = Executors.newSingleThreadExecutor()
+
+    /**
+     * Monotonic timestamp for the pose landmarker's VIDEO mode, which rejects a
+     * timestamp that does not strictly increase. Pose runs on a single-thread
+     * executor so calls are already serialised; this only has to keep counting.
+     */
+    private val poseTimestamp = java.util.concurrent.atomic.AtomicLong(0L)
+
+    /** Pose landmarks for one frame, as the flat 25 x (x, y, z, visibility) block. */
+    private fun detectPose(frame: Bitmap): FloatArray {
+        val out = FloatArray(100)
+        // VIDEO mode instead of IMAGE: it tracks the pose between frames rather
+        // than re-detecting from scratch, which is cheaper per frame and steadier
+        // over time. Same model weights, so the landmark distribution the word
+        // models were trained on is unchanged — that matters here, because the
+        // pose block is never wrist-normalised and carries roughly 34 points of
+        // accuracy, so anything that shifts it is a domain change, not a
+        // speedup.
+        //
+        // Deliberately NOT applied to the hand landmarker: that one alternates
+        // between the full canvas and a crop around the hand, two different
+        // coordinate spaces, and VIDEO mode would carry tracking state across
+        // the two.
+        val result = poseLandmarker?.detectForVideo(
+            BitmapImageBuilder(frame).build(),
+            poseTimestamp.addAndGet(33L)
+        ) ?: return out
+        val list = result.landmarks()
+        if (list.isEmpty()) return out
+        val points = list[0]
+        for (j in 0 until minOf(25, points.size)) {
+            if (j * 4 + 3 >= out.size) break
+            out[j * 4] = points[j].x()
+            out[j * 4 + 1] = points[j].y()
+            out[j * 4 + 2] = points[j].z()
+            val vis = readVisibility(points[j])
+            out[j * 4 + 3] = if (vis.isNaN()) 1f else vis
+        }
+        return out
+    }
 
     /**
      * Letters mode used to run the hand landmarker twice per frame — once on the
@@ -181,6 +317,112 @@ class MainActivity : FlutterActivity() {
                     }
                 }
 
+                /**
+                 * Speech input via the system's recognition ACTIVITY.
+                 *
+                 * speech_to_text binds android.speech.RecognitionService
+                 * directly, and on this device that path is throttled by
+                 * Google with error_too_many_requests no matter how far the
+                 * requests are spaced. The activity route is what the keyboard
+                 * microphone uses, and it is not subject to the same limit.
+                 *
+                 * The trade is that the system shows its own listening dialog
+                 * rather than the in-app button — worse to look at, but it
+                 * returns text, which the other path does not.
+                 */
+                "listenViaActivity" -> {
+                    val lang = call.argument<String>("lang") ?: "en-US"
+                    if (speechResult != null) {
+                        result.error("BUSY", "already listening", null)
+                        return@setMethodCallHandler
+                    }
+                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                            RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                        putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
+                        putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+                        putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+                        // Prefer the on-device model where one exists, so this
+                        // stays local when the device can manage it.
+                        putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+                    }
+                    // Prefer Google's handler explicitly. Left to the system,
+                    // this resolves to MIUI's AsrActivity — the only other
+                    // handler registered here — which errors out and closes.
+                    val pm = packageManager
+                    val google = "com.google.android.tts"
+                    val hasGoogle = pm.queryIntentActivities(intent, 0)
+                        .any { it.activityInfo?.packageName == google }
+                    if (hasGoogle) intent.setPackage(google)
+
+                    try {
+                        speechResult = result
+                        startActivityForResult(intent, SPEECH_REQUEST)
+                    } catch (e: Exception) {
+                        speechResult = null
+                        result.error("NO_ACTIVITY",
+                            "No speech input app on this device", null)
+                    }
+                }
+
+                /**
+                 * App-private files directory, for small persistent flags.
+                 *
+                 * Used to remember that the onboarding tour has been seen.
+                 * A marker file rather than shared_preferences: the channel
+                 * already exists and works, and adding a dependency days
+                 * before a defence is a risk with no matching benefit for one
+                 * boolean.
+                 */
+                "appFilesDir" -> {
+                    result.success(filesDir.absolutePath)
+                }
+
+                /**
+                 * App-specific external storage, for the debug tensor dump.
+                 *
+                 * Offline evaluation predicts the ASL model should recognise
+                 * roughly half of signs under simulated device conditions, and
+                 * live it recognises almost none. Everything cheap has been
+                 * ruled out by measurement -- frame rate, segmentation,
+                 * canonicalisation, zero-hand frames -- so the remaining step is
+                 * to capture what the device actually feeds the model and diff
+                 * it against the corpus, dimension by dimension.
+                 *
+                 * This path needs no permission and is reachable over adb:
+                 *   adb pull /sdcard/Android/data/<pkg>/files/tensor_dumps
+                 */
+                /**
+                 * App-specific external storage root, for the diagnostic trace.
+                 *
+                 * Deliberately NOT appFilesDir, which returns internal storage:
+                 * plain `adb pull` cannot read /data/user/0/<pkg> on a stock
+                 * device, so a trace written there is only reachable through
+                 * `run-as` -- which works on a debuggable build and stops
+                 * working on the release one, exactly when a field failure
+                 * would matter most.
+                 *
+                 *   adb pull /sdcard/Android/data/<pkg>/files/trace.log
+                 *
+                 * Falls back to internal storage rather than failing: a trace
+                 * that is awkward to retrieve still beats no trace at all.
+                 */
+                "traceDir" -> {
+                    val dir = getExternalFilesDir(null)
+                    result.success((dir ?: filesDir).absolutePath)
+                }
+
+                "dumpDir" -> {
+                    val dir = getExternalFilesDir(null)
+                    if (dir == null) {
+                        result.success(null)
+                    } else {
+                        val out = java.io.File(dir, "tensor_dumps")
+                        if (!out.exists()) out.mkdirs()
+                        result.success(out.absolutePath)
+                    }
+                }
+
                 else -> result.notImplemented()
             }
         }
@@ -223,7 +465,7 @@ class MainActivity : FlutterActivity() {
                                 .setDelegate(delegate)
                                 .build()
                         )
-                        .setRunningMode(RunningMode.IMAGE)
+                        .setRunningMode(RunningMode.VIDEO)
                         .setMinPoseDetectionConfidence(0.5f)
                         .setMinPosePresenceConfidence(0.5f)
                         .setMinTrackingConfidence(0.5f)
@@ -339,19 +581,113 @@ class MainActivity : FlutterActivity() {
         val canvas = Canvas(canvasBmp)
         canvas.drawColor(Color.BLACK)
 
-        boxScale = minOf(
+        // Letterbox geometry, still needed as the fallback and as the frame of
+        // reference for translating the last pose back into upright pixels.
+        val fitScale = minOf(
             CANVAS_W.toFloat() / upright.width,
             CANVAS_H.toFloat() / upright.height
         )
-        val dw = upright.width * boxScale
-        val dh = upright.height * boxScale
-        boxLeft = (CANVAS_W - dw) / 2f
-        boxTop = (CANVAS_H - dh) / 2f
-        canvas.drawBitmap(
-            upright, null,
-            RectF(boxLeft, boxTop, boxLeft + dw, boxTop + dh),
-            canvasPaint
-        )
+        val fitW = upright.width * fitScale
+        val fitH = upright.height * fitScale
+        val fitLeft = (CANVAS_W - fitW) / 2f
+        val fitTop = (CANVAS_H - fitH) / 2f
+
+        // Aim the crop using the PREVIOUS frame's pose, which was measured in
+        // the previous frame's canvas space, so it has to come back through the
+        // box mapping that produced it.
+        if (signerShoulder > 0f) {
+            val shoulderPx = signerShoulder * CANVAS_W / boxScale
+            val cxPx = (signerCx * CANVAS_W - boxLeft) / boxScale
+            val cyPx = (signerCy * CANVAS_H - boxTop) / boxScale
+
+            // Width that puts the shoulders at the corpus proportion.
+            var wantW = shoulderPx / TARGET_SHOULDER
+            // Never zoom past the full frame, and never so tight that a raised
+            // hand leaves the crop.
+            //
+            // minW is clamped to maxW before use. Without that, a stale
+            // shoulder measurement makes minW exceed the frame width and
+            // coerceIn throws "Cannot coerce value to an empty range" — which
+            // extractLandmarks catches and turns into an all-zero vector, so
+            // every frame silently reports no hands and no pose from then on.
+            // Letters mode reaches that state easily: it never runs pose, so
+            // signerShoulder and boxScale drift out of step with each other.
+            val maxW = upright.width.toFloat()
+            val minW = (shoulderPx * 1.6f).coerceAtMost(maxW)
+            wantW = wantW.coerceIn(minW, maxW)
+
+            // Signing space sits above the shoulders more than below, so bias
+            // the crop upward rather than centring on the shoulder line.
+            val wantCy = cyPx - wantW * 0.12f
+
+            if (cropW <= 0f) {
+                cropW = wantW; cropCx = cxPx; cropCy = wantCy
+            } else {
+                cropW += (wantW - cropW) * CROP_SMOOTH
+                cropCx += (cxPx - cropCx) * CROP_SMOOTH
+                cropCy += (wantCy - cropCy) * CROP_SMOOTH
+            }
+        } else if (cropW > 0f && signerLostFrames > CROP_GRACE_FRAMES) {
+            // Signer lost for long enough that this is not a blink. Open the
+            // box back out and drift it toward the centre, so each frame sees
+            // more of the scene than the last and pose gets a chance to
+            // re-acquire. Once it reaches the full frame, drop back to the
+            // letterbox entirely -- which is the widest view available and the
+            // state the pipeline starts in.
+            cropW *= CROP_RELAX
+            cropCx += (upright.width / 2f - cropCx) * 0.2f
+            cropCy += (upright.height / 2f - cropCy) * 0.2f
+            if (cropW >= upright.width) {
+                cropW = -1f
+                // W level deliberately: logcat on this device drops the app's
+                // Log.d and every I/flutter line, but app W and E survive
+                // (CameraDevice-JV-1 warnings from this very process do). This
+                // is the one marker that proves the recovery fired.
+                Log.w("MediaPipe",
+                    "crop relaxed to full frame after " +
+                    "$signerLostFrames lost frames")
+            }
+        }
+
+        var drew = false
+        if (cropW > 0f) {
+            val cw = cropW
+            val ch = cw * CANVAS_H / CANVAS_W
+            if (cw <= upright.width && ch <= upright.height) {
+                // Guarded the same way: cw or ch can equal the frame size, so
+                // the upper bound can legitimately be 0, and floating point
+                // can make it very slightly negative.
+                var l = cropCx - cw / 2f
+                var t = cropCy - ch / 2f
+                l = l.coerceIn(0f, (upright.width - cw).coerceAtLeast(0f))
+                t = t.coerceIn(0f, (upright.height - ch).coerceAtLeast(0f))
+
+                canvas.drawBitmap(
+                    upright,
+                    Rect(l.toInt(), t.toInt(),
+                         (l + cw).toInt(), (t + ch).toInt()),
+                    RectF(0f, 0f, CANVAS_W.toFloat(), CANVAS_H.toFloat()),
+                    canvasPaint
+                )
+                // Keep canvas -> upright mapping in the same form the overlay
+                // and hand-crop code already use: canvas = box + upright*scale.
+                boxScale = CANVAS_W / cw
+                boxLeft = -l * boxScale
+                boxTop = -t * boxScale
+                drew = true
+            }
+        }
+
+        if (!drew) {
+            boxScale = fitScale
+            boxLeft = fitLeft
+            boxTop = fitTop
+            canvas.drawBitmap(
+                upright, null,
+                RectF(fitLeft, fitTop, fitLeft + fitW, fitTop + fitH),
+                canvasPaint
+            )
+        }
 
         return canvasBmp
     }
@@ -494,6 +830,25 @@ class MainActivity : FlutterActivity() {
         val frame = buildCanvas(pixels, width, height, rotation, mirror)
         val t2 = System.nanoTime()
 
+        // Pose is launched NOW, concurrently with the hand work below, instead of
+        // waiting its turn afterwards.
+        //
+        // The two landmarkers are separate instances that only read the frame, so
+        // running them together is safe, and the cost becomes max(hand, pose)
+        // rather than hand + pose. Measured sequentially: hand 72-171ms and pose
+        // 95-176ms, so this is worth roughly a third of the frame budget.
+        //
+        // Frame rate is the binding constraint for ASL in particular: its
+        // training sequences move 3.6x as much per timestep as FSL's, so at any
+        // given capture rate ASL is undersampled that much worse, and fast signs
+        // never accumulate enough distinct frames to classify.
+        val poseFuture: java.util.concurrent.Future<FloatArray>? =
+            if (!lettersMode) {
+                poseExecutor.submit<FloatArray> { detectPose(frame) }
+            } else {
+                null
+            }
+
         var handResult: HandLandmarkerResult? = null
         var cropped = false
         var tracked = false
@@ -611,32 +966,55 @@ class MainActivity : FlutterActivity() {
         // expensive model in the pipeline.
         var pose = FloatArray(100)
         var poseRan = false
+        if (lettersMode) {
+            // Letters never runs pose, so anything the crop tracker holds is
+            // from an older words session and will not be refreshed. Letting
+            // it persist is what allowed the shoulder measurement and the box
+            // scale to drift apart.
+            signerShoulder = -1f
+            cropW = -1f
+            signerLostFrames = 0
+        }
         if (!lettersMode) {
-            val stale = cachedPoseFrame < 0 ||
-                (frameCounter - cachedPoseFrame) >= POSE_EVERY_N
-            if (stale) {
-                poseRan = true
-                val poseResult =
-                    poseLandmarker?.detect(BitmapImageBuilder(frame).build())
-                if (poseResult != null) {
-                    val poseLandmarksList = poseResult.landmarks()
-                    if (poseLandmarksList.isNotEmpty()) {
-                        val points = poseLandmarksList[0]
-                        val count = minOf(25, points.size)
-                        for (j in 0 until count) {
-                            if (j * 4 + 3 >= pose.size) break
-                            pose[j * 4] = points[j].x()
-                            pose[j * 4 + 1] = points[j].y()
-                            pose[j * 4 + 2] = points[j].z()
-                            val vis = readVisibility(points[j])
-                            pose[j * 4 + 3] = if (vis.isNaN()) 1f else vis
-                        }
-                    }
+            poseRan = true
+            // Collect the result of the task started before the hand work. By now
+            // it has usually finished already, so this costs nothing.
+            pose = try {
+                // Bounded, not an open-ended get(). An unbounded wait here
+                // blocks the worker thread, so result.success() is never
+                // posted, so the Dart await never completes, so _isProcessing
+                // stays set and every later frame is dropped at the re-entry
+                // guard — the camera keeps previewing and detects nothing.
+                // A frame is ~80ms, so 1500ms only trips on a real stall, and
+                // losing this frame's pose is far better than losing the app.
+                poseFuture?.get(1500, java.util.concurrent.TimeUnit.MILLISECONDS)
+                    ?: FloatArray(100)
+            } catch (e: Exception) {
+                Log.e("MediaPipe", "pose task failed: ${e.message}")
+                FloatArray(100)
+            }
+        }
+
+        // Remember where the signer is, so the NEXT frame can crop to them.
+        // Landmarks 11 and 12 are the shoulders; visibility is index 3.
+        if (poseRan) {
+            val lsx = pose[11 * 4]; val lsy = pose[11 * 4 + 1]
+            val rsx = pose[12 * 4]; val rsy = pose[12 * 4 + 1]
+            if ((lsx != 0f || lsy != 0f) && (rsx != 0f || rsy != 0f)) {
+                val w = kotlin.math.hypot((lsx - rsx).toDouble(),
+                                          (lsy - rsy).toDouble()).toFloat()
+                if (w > 0.01f) {
+                    signerCx = (lsx + rsx) / 2f
+                    signerCy = (lsy + rsy) / 2f
+                    signerShoulder = w
+                    signerLostFrames = 0
                 }
-                cachedPose = pose.copyOf()
-                cachedPoseFrame = frameCounter
             } else {
-                pose = cachedPose.copyOf()
+                // Lost the signer. Setting this alone does NOT relax the crop
+                // -- it only stops it being updated -- so the counter above is
+                // what actually drives it back open in buildCanvas.
+                signerShoulder = -1f
+                signerLostFrames++
             }
         }
 
@@ -746,6 +1124,7 @@ class MainActivity : FlutterActivity() {
 
     override fun onDestroy() {
         executor.shutdown()
+        poseExecutor.shutdown()
         handLandmarker?.close()
         poseLandmarker?.close()
         srcBitmap?.recycle()

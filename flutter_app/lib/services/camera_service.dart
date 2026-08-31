@@ -19,7 +19,6 @@ class CameraService {
   static CameraController? get controller => _controller;
   static CameraDescription? get activeCamera => _active;
   static bool get hasMultipleCameras => _cameras.length > 1;
-  static bool get isStreaming => _controller?.value.isStreamingImages ?? false;
 
   static bool get isFrontCamera =>
       _active?.lensDirection == CameraLensDirection.front;
@@ -97,10 +96,33 @@ class CameraService {
     return _isInitialized;
   }
 
+  /// Whether WE believe a stream is running.
+  ///
+  /// Deliberately separate from `controller.value.isStreamingImages`. That flag
+  /// can be left true after a stop that did not fully take, and both plugin
+  /// methods are guarded by it — so startImageStream returns without starting
+  /// and stopImageStream returns without stopping. The result is a camera that
+  /// previews normally and delivers no frames, recoverable only by killing the
+  /// app: stop/start recognition, switching mode and the watchdog all failed
+  /// for exactly this reason.
+  static bool _streaming = false;
+
+  static bool get isStreaming => _streaming;
+
   static Future<void> startImageStream(
       void Function(CameraImage) onFrame) async {
     if (!_isInitialized || _controller == null) return;
-    if (_controller!.value.isStreamingImages) return;
+    if (_streaming) return;
+
+    // Reconcile a stale plugin flag before starting, or the call below is a
+    // silent no-op.
+    if (_controller!.value.isStreamingImages) {
+      try {
+        await _controller!.stopImageStream();
+      } catch (_) {
+        // Already stopped underneath us; the flag was simply wrong.
+      }
+    }
 
     _onFrame = onFrame;
     _frameCount = 0;
@@ -111,18 +133,48 @@ class CameraService {
         onFrame(image);
       }
     });
+    _streaming = true;
   }
 
   static Future<void> stopImageStream() async {
+    // Cleared first so a throw below cannot leave us believing we stream.
+    _streaming = false;
     if (_controller == null) return;
-    if (!_controller!.value.isStreamingImages) return;
-    await _controller!.stopImageStream();
+    try {
+      if (_controller!.value.isStreamingImages) {
+        await _controller!.stopImageStream();
+      }
+    } catch (_) {
+      // Nothing to stop.
+    }
+  }
+
+  /// Tears the camera down and brings it back up, then restarts the stream.
+  ///
+  /// The escalation when restarting the stream alone is not enough — a fresh
+  /// controller is the only thing guaranteed to clear plugin-side state, and
+  /// it is what killing the app was achieving by hand.
+  static Future<bool> hardRestart(void Function(CameraImage) onFrame) async {
+    try {
+      await stopImageStream();
+      await dispose();
+      await initialize();
+      if (!_isInitialized) return false;
+      await startImageStream(onFrame);
+      return _streaming;
+    } catch (e) {
+      debugPrint('camera hardRestart failed: $e');
+      return false;
+    }
   }
 
   static Future<void> _disposeController() async {
     final controller = _controller;
     _controller = null;
     _isInitialized = false;
+    // Or a fresh controller inherits the belief that a stream is already
+    // running, and startImageStream silently declines to start one.
+    _streaming = false;
     if (controller == null) return;
     try {
       if (controller.value.isStreamingImages) {

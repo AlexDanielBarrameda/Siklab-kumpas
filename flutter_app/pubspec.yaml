@@ -15,10 +15,15 @@ dependencies:
 
   # Speech
   speech_to_text: ^7.0.0
+  # Offline speech recognition. The device's system recognisers are all
+  # unusable here: Google's is throttled, Google TTS's has no matching
+  # language, and MIUI's dialog errors out. This runs on-device instead,
+  # which also removes the only part of the app that left the phone.
+  vosk_flutter_service: ^0.1.2
   flutter_tts: ^4.0.0
 
   # Permissions
-  permission_handler: ^11.0.0
+  permission_handler: ^12.0.3
 
   # Flashlight
   torch_light: ^1.0.0
@@ -28,6 +33,9 @@ dependencies:
   google_fonts: ^6.0.0
   tflite_flutter: ^0.12.1
   flutter_svg: ^2.3.0
+
+  # ASL avatar clip playback
+  video_player: ^2.9.0
 
 dev_dependencies:
   flutter_test:
@@ -41,3 +49,4 @@ flutter:
     - assets/models/
     - assets/labels/
     - assets/icons/
+    - assets/avatar/clips/

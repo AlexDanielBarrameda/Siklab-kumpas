@@ -1,0 +1,86 @@
+[
+ {
+  "gloss": "FLOOR",
+  "constrained": "<err: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'm>",
+  "open": "<err: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'm>",
+  "constrained_ok": false,
+  "open_ok": false
+ },
+ {
+  "gloss": "WILLGO",
+  "constrained": "<err: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'm>",
+  "open": "<err: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'm>",
+  "constrained_ok": false,
+  "open_ok": false
+ },
+ {
+  "gloss": "LOVE",
+  "constrained": "<err: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'm>",
+  "open": "<err: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'm>",
+  "constrained_ok": false,
+  "open_ok": false
+ },
+ {
+  "gloss": "HELLO",
+  "constrained": "<err: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'm>",
+  "open": "<err: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'm>",
+  "constrained_ok": false,
+  "open_ok": false
+ },
+ {
+  "gloss": "ROB",
+  "constrained": "<err: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'm>",
+  "open": "<err: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'm>",
+  "constrained_ok": false,
+  "open_ok": false
+ },
+ {
+  "gloss": "ANNOUNCE",
+  "constrained": "<err: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'm>",
+  "open": "<err: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'm>",
+  "constrained_ok": false,
+  "open_ok": false
+ },
+ {
+  "gloss": "EXPERIMENT",
+  "constrained": "<err: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'm>",
+  "open": "<err: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'm>",
+  "constrained_ok": false,
+  "open_ok": false
+ },
+ {
+  "gloss": "INTEREST",
+  "constrained": "<err: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'm>",
+  "open": "<err: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'm>",
+  "constrained_ok": false,
+  "open_ok": false
+ },
+ {
+  "gloss": "PULLCONVINCE",
+  "constrained": "<err: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'm>",
+  "open": "<err: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'm>",
+  "constrained_ok": false,
+  "open_ok": false
+ },
+ {
+  "gloss": "CHALLENGE",
+  "constrained": "<err: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'm>",
+  "open": "<err: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'm>",
+  "constrained_ok": false,
+  "open_ok": false
+ },
+ {
+  "gloss": "KEY",
+  "constrained": "<err: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'm>",
+  "open": "<err: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'm>",
+  "constrained_ok": false,
+  "open_ok": false
+ },
+ {
+  "gloss": "ADVERTISE",
+  "constrained": "<err: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'm>",
+  "open": "<err: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'm>",
+  "constrained_ok": false,
+  "open_ok": false
+ }
+]

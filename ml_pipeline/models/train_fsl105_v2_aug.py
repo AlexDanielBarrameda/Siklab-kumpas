@@ -54,7 +54,90 @@ HAND = slice(0, 126)
 POSE_XYZ = [126 + 4 * k + c for k in range(25) for c in (0, 1, 2)]
 
 
-def _augment_one(seq):
+# Per-corpus calibration. These MUST be passed explicitly for a new corpus:
+# ASL inherited the FSL numbers by default and both were wrong for it.
+#
+#   scale_range   FSL training hand span is ~0.10 median against a device that
+#                 measures 0.20-0.33, so FSL needs scaling UP. ASL's span is
+#                 already 0.214 and matches the device, so the same range
+#                 stretched ASL hands to 0.64 — physically implausible, and a
+#                 large share of its augmented set was junk.
+#
+#   keep_frames   how many DISTINCT frames to subsample to before stretching
+#                 back to SEQ, simulating a low capture rate. The device
+#                 delivers 4-6 distinct frames per sign; the original 0.1-0.4
+#                 drop rate simulated 18-27, so the model never saw its own
+#                 operating condition.
+#   frame_range   how much of the canvas the SIGNER'S BODY fills, scaled about
+#                 the canvas centre. The pose block is stored as absolute
+#                 letterboxed image coordinates — the wrist normalisation only
+#                 touches indices 0..126 — so framing feeds straight into 100 of
+#                 the 226 dims, and substituting an uninformative pose costs 34
+#                 accuracy points. Measured median shoulder width:
+#
+#                     FSL-105 v2   0.222      ASL Citizen  0.410
+#
+#                 Both corpora are landscape (FSL-105 source is 640x360, so its
+#                 extractor letterboxes it at scale 1.0). The difference is
+#                 filming DISTANCE, not orientation: the FSL signer stands far
+#                 enough back to occupy roughly half the apparent width of an
+#                 ASL Citizen signer.
+#
+#                 That gap happens to land FSL in the same regime the device
+#                 produces by a different route — MainActivity rotates the
+#                 sensor frame upright to portrait and letterboxes it into the
+#                 480x360 canvas at scale 0.5625, so the signer fills 56% of the
+#                 width. Measured device signing posture (-1.14) sits inside
+#                 FSL's range (p5 -1.18) and outside ASL's (p5 -0.78), which is
+#                 why the shared pipeline works for FSL words and fails for ASL
+#                 words. Simulating the device letterbox on ASL test clips costs
+#                 9.6 points on its own. FSL already sits in the right regime,
+#                 so its range stays tight around 1.0.
+FSL_AUG = dict(scale_range=(0.8, 3.0), keep_frames=(18, 27), drop_prob=0.7,
+               frame_range=(0.92, 1.08))
+ASL_AUG = dict(scale_range=(0.7, 1.4), keep_frames=(4, 15), drop_prob=0.85,
+               frame_range=(0.50, 1.05))
+
+# Measured under the device condition (device framing + 5 distinct frames),
+# top-1 on the signer-disjoint test split:
+#
+#     baseline: wide scale, NO framing aug     48.06%
+#     narrow scale, NO framing aug             43.46%
+#     narrow scale + framing aug (ASL_AUG)     59.86%
+#     wide scale   + framing aug (this)        59.13%
+#
+# Read the first two rows alone and the wide range looks essential — narrowing
+# it to a physically plausible (0.7, 1.4) cost 4.6 points. The last two rows
+# show why that reading was wrong: once framing is augmented explicitly the two
+# ranges tie. The wide range was never buying scale robustness on its own, it
+# was partially compensating for the framing gap, because scaling the whole
+# body up and down incidentally covers some of the same variation.
+#
+# So ASL_AUG (plausible scale + explicit framing) is the one to use; this
+# variant is kept only to document that the wide range adds nothing once the
+# real cause is addressed.
+ASL_AUG_WIDE = dict(scale_range=(0.8, 3.0), keep_frames=(4, 15), drop_prob=0.85,
+                    frame_range=(0.50, 1.05))
+
+# For body-normalised features (body_normalize.py), where every coordinate is
+# already expressed in shoulder widths.
+#
+# frame_range MUST be disabled here. The framing transform scales pose about the
+# canvas centre (0.5, 0.5), which is only meaningful for absolute image
+# coordinates; body-normalised pose is centred on 0, so the same transform would
+# translate the whole body by 0.5*(1-s) and corrupt it. Framing invariance is
+# structural now rather than learned, so the augmentation is redundant as well as
+# wrong.
+#
+# scale_range stays mild for regularisation only — apparent size is already
+# normalised out, so a wide range would reintroduce the nuisance the transform
+# exists to remove.
+ASL_AUG_BODYNORM = dict(scale_range=(0.9, 1.15), keep_frames=(4, 15),
+                        drop_prob=0.85, frame_range=(1.0, 1.0))
+
+
+def _augment_one(seq, scale_range=(0.8, 3.0), keep_frames=(18, 27),
+                 drop_prob=0.7, frame_range=(0.92, 1.08)):
     """seq: (30, 226) -> augmented copy."""
     s = seq.copy()
 
@@ -62,12 +145,7 @@ def _augment_one(seq):
     live = np.any(s[:, HAND] != 0, axis=1)
 
     # --- spatial: scale about the wrist anchor, translate, rotate ---
-    # Training hand span is ~0.10 median; the device measures 0.20-0.33. A
-    # 0.75-1.9 range was tried first and left only 21% of augmented samples
-    # inside the live band, because its median scale (~1.3) lands at 0.13.
-    # This range spans "as filmed" through "3x closer", so the augmented set
-    # covers both the clean test distribution and the phone's.
-    scale = rng.uniform(0.8, 3.0)
+    scale = rng.uniform(*scale_range)
     theta = np.deg2rad(rng.uniform(-12, 12))
     tx, ty = rng.uniform(-0.05, 0.05, 2)
     ca, sa = np.cos(theta), np.sin(theta)
@@ -108,25 +186,54 @@ def _augment_one(seq):
             pose[t] = p
         s[:, POSE_XYZ] = pose.reshape(SEQ, -1)
 
+    # --- framing: how much of the canvas the body fills ---
+    #
+    # Simulates the device letterbox. MainActivity rotates the sensor frame
+    # upright to portrait, then fits it into the 480x360 training canvas at
+    # scale min(480/480, 360/640) = 0.5625, leaving the signer in a narrow
+    # central column. Pose is read from that full canvas and is never
+    # wrist-normalised, so the compression lands directly in the features.
+    #
+    # Deliberately POSE ONLY. The hand blocks escape this on device because the
+    # second landmarker pass re-crops around the hand, which is why measured
+    # device hand span (0.18-0.28) already matches the corpus (0.218) while the
+    # body does not.
+    frame_s = rng.uniform(*frame_range)
+    if abs(frame_s - 1.0) > 1e-6:
+        live_pose = np.any(s[:, 126:] != 0, axis=1)
+        for k in range(25):
+            xi, yi, zi = 126 + 4 * k, 126 + 4 * k + 1, 126 + 4 * k + 2
+            s[live_pose, xi] = (s[live_pose, xi] - 0.5) * frame_s + 0.5
+            s[live_pose, yi] = (s[live_pose, yi] - 0.5) * frame_s + 0.5
+            s[live_pose, zi] *= frame_s
+
     # --- landmark jitter ---
     noise = rng.normal(0, 0.004, size=s[:, HAND].shape)
     mask = (s[:, HAND] != 0)
     s[:, HAND] += noise * mask
 
-    # --- temporal: drop frames and re-stretch, mimicking ~4 fps live capture ---
-    if rng.random() < 0.7:
-        keep = np.where(rng.random(SEQ) > rng.uniform(0.1, 0.4))[0]
-        if len(keep) >= 6:
-            idx = np.linspace(0, len(keep) - 1, SEQ).round().astype(int)
-            s = s[keep[idx]]
+    # --- temporal: subsample to N distinct frames, then stretch back to SEQ ---
+    #
+    # This mirrors the live pipeline exactly: it collects however many frames
+    # the camera manages, then resamples that run to SEQ before inference. Doing
+    # the same here is what teaches the model to read a sparsely sampled sign,
+    # rather than only the densely sampled ones in the corpus.
+    if rng.random() < drop_prob:
+        lo, hi = keep_frames
+        n_keep = int(rng.integers(lo, hi + 1))
+        if n_keep < SEQ:
+            pick = np.linspace(0, SEQ - 1, n_keep).round().astype(int)
+            back = np.linspace(0, n_keep - 1, SEQ).round().astype(int)
+            s = s[pick][back]
 
     return s.astype(np.float32)
 
 
-def augment_set(X, y, copies):
+def augment_set(X, y, copies, **aug):
+    """`aug` selects the per-corpus calibration; see FSL_AUG / ASL_AUG."""
     outX, outY = [X], [y]
     for _ in range(copies):
-        outX.append(np.stack([_augment_one(v) for v in X]))
+        outX.append(np.stack([_augment_one(v, **aug) for v in X]))
         outY.append(y)
     return np.concatenate(outX), np.concatenate(outY)
 

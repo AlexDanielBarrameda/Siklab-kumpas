@@ -1,0 +1,181 @@
+WARNING:tensorflow:From C:\Users\Dan\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\core.py:232: The name tf.placeholder is deprecated. Please use tf.compat.v1.placeholder instead.
+
+C:\Users\Dan\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\saving\saving_lib.py:797: UserWarning: Skipping variable loading for optimizer 'adam', because it has 70 variables whereas the saved optimizer has 54 variables. 
+  saveable.load_own_variables(weights_store.get(inner_path))
+tensor_dumps: 185 captures -> 20 groups, 20 words given
+total 20 groups, 20 words
+  group 0 HELLO: 12 examples
+  group 1 GOOD: 10 examples
+  group 2 MORNING: 10 examples
+  group 3 AFTERNOON: 10 examples
+  group 4 DAY: 10 examples
+  group 5 HOW: 10 examples
+  group 6 YOU: 10 examples
+  group 7 ME: 10 examples
+  group 8 FINE: 10 examples
+  group 9 THANKYOU: 10 examples
+  group 10 WATER: 10 examples
+  group 11 PLEASE: 10 examples
+  group 12 EAT: 10 examples
+  group 13 HANDSOME: 10 examples
+  group 14 SKIP: not in the label set, skipped
+  group 15 WHY: 10 examples
+  group 16 SKIP: not in the label set, skipped
+  group 17 KNOW: 10 examples
+  group 18 WE: 10 examples
+  group 19 PHONE: 10 examples
+
+device examples: 145 train + 37 held out, across 18 words
+corpus train 830, corpus test 687
+
+before adaptation
+  base       corpus  89.81%   device-train  77.24%   device-HELD-OUT  64.86%  (shown 62.16%)
+
+unfrozen layers: 20/48
+mix: 830 corpus + 145x2 device = 1120
+Epoch 1/25
+70/70 - 7s - 98ms/step - accuracy: 0.8795 - loss: 1.4025 - learning_rate: 2.0000e-04
+Epoch 2/25
+70/70 - 2s - 34ms/step - accuracy: 0.9228 - loss: 1.2772 - learning_rate: 2.0000e-04
+Epoch 3/25
+70/70 - 2s - 34ms/step - accuracy: 0.9312 - loss: 1.2460 - learning_rate: 2.0000e-04
+Epoch 4/25
+70/70 - 2s - 34ms/step - accuracy: 0.9487 - loss: 1.2043 - learning_rate: 2.0000e-04
+Epoch 5/25
+70/70 - 2s - 34ms/step - accuracy: 0.9540 - loss: 1.1868 - learning_rate: 2.0000e-04
+Epoch 6/25
+70/70 - 2s - 34ms/step - accuracy: 0.9607 - loss: 1.1710 - learning_rate: 2.0000e-04
+Epoch 7/25
+70/70 - 2s - 34ms/step - accuracy: 0.9665 - loss: 1.1516 - learning_rate: 2.0000e-04
+Epoch 8/25
+70/70 - 2s - 33ms/step - accuracy: 0.9656 - loss: 1.1493 - learning_rate: 2.0000e-04
+Epoch 9/25
+70/70 - 2s - 35ms/step - accuracy: 0.9723 - loss: 1.1382 - learning_rate: 2.0000e-04
+Epoch 10/25
+70/70 - 2s - 36ms/step - accuracy: 0.9696 - loss: 1.1311 - learning_rate: 2.0000e-04
+Epoch 11/25
+70/70 - 2s - 34ms/step - accuracy: 0.9768 - loss: 1.1221 - learning_rate: 2.0000e-04
+Epoch 12/25
+70/70 - 2s - 34ms/step - accuracy: 0.9768 - loss: 1.1139 - learning_rate: 2.0000e-04
+Epoch 13/25
+70/70 - 3s - 37ms/step - accuracy: 0.9795 - loss: 1.1034 - learning_rate: 2.0000e-04
+Epoch 14/25
+70/70 - 3s - 37ms/step - accuracy: 0.9781 - loss: 1.0981 - learning_rate: 2.0000e-04
+Epoch 15/25
+70/70 - 3s - 36ms/step - accuracy: 0.9768 - loss: 1.0900 - learning_rate: 2.0000e-04
+Epoch 16/25
+70/70 - 2s - 36ms/step - accuracy: 0.9844 - loss: 1.0928 - learning_rate: 2.0000e-04
+Epoch 17/25
+70/70 - 3s - 36ms/step - accuracy: 0.9808 - loss: 1.0860 - learning_rate: 2.0000e-04
+Epoch 18/25
+70/70 - 3s - 36ms/step - accuracy: 0.9821 - loss: 1.0748 - learning_rate: 2.0000e-04
+Epoch 19/25
+70/70 - 2s - 34ms/step - accuracy: 0.9795 - loss: 1.0800 - learning_rate: 2.0000e-04
+Epoch 20/25
+70/70 - 2s - 34ms/step - accuracy: 0.9875 - loss: 1.0702 - learning_rate: 2.0000e-04
+Epoch 21/25
+70/70 - 2s - 34ms/step - accuracy: 0.9862 - loss: 1.0656 - learning_rate: 2.0000e-04
+Epoch 22/25
+70/70 - 2s - 35ms/step - accuracy: 0.9817 - loss: 1.0671 - learning_rate: 2.0000e-04
+Epoch 23/25
+70/70 - 2s - 34ms/step - accuracy: 0.9804 - loss: 1.0605 - learning_rate: 2.0000e-04
+Epoch 24/25
+70/70 - 2s - 35ms/step - accuracy: 0.9839 - loss: 1.0614 - learning_rate: 2.0000e-04
+Epoch 25/25
+70/70 - 2s - 35ms/step - accuracy: 0.9871 - loss: 1.0568 - learning_rate: 2.0000e-04
+
+after adaptation
+  adapted    corpus  90.54%   device-train 100.00%   device-HELD-OUT  97.30%  (shown 97.30%)
+Saved artifact at 'C:\Users\Dan\AppData\Local\Temp\tmptkdmsye8'. The following endpoints are available:
+
+* Endpoint 'serve'
+  args_0 (POSITIONAL_ONLY): TensorSpec(shape=(None, 30, 754), dtype=tf.float32, name='input_layer')
+Output Type:
+  TensorSpec(shape=(None, 57), dtype=tf.float32, name=None)
+Captures:
+  2027611302480: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027611303632: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027611303056: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027611303440: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027611300560: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027611303248: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027611304016: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027611302864: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027611304976: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027611304784: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027611304592: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027611302672: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027611303824: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027611304400: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027611305168: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027611306320: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027611305744: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027611305936: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027611306128: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027611305552: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027611306704: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027611305360: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027611307856: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027611307088: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027611307280: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027611306512: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027611306896: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027611307472: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629347088: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629348432: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629348624: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629348816: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629347664: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629348048: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629349584: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629347856: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629350736: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629350160: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629350352: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629350544: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629349968: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629351120: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629349776: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629352272: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629352080: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629351504: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629352848: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629353808: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629353424: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629354384: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629354000: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629354960: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629354576: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629355536: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629354768: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629355344: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629353040: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629356304: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629355920: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629356880: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629356112: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629356688: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629353232: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629357648: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629357456: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629358032: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629357840: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629358416: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629357264: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629358992: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629356496: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629358608: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629357072: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629359952: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629359568: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629360528: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629355728: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629360144: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629360720: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2027629361872: TensorSpec(shape=(), dtype=tf.resource, name=None)
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+W0000 00:00:1788174494.993058    3524 tf_tfl_flatbuffer_helpers.cc:364] Ignored output_format.
+W0000 00:00:1788174494.993635    3524 tf_tfl_flatbuffer_helpers.cc:367] Ignored drop_control_dependency.
+I0000 00:00:1788174495.038288    3524 mlir_graph_optimization_pass.cc:437] MLIR V1 optimization pass is not enabled
+
+TFLite: asl_v3_demo56adapt4.tflite  (2007 KB)
