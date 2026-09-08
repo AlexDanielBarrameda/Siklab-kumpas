@@ -631,6 +631,45 @@ class InferenceService {
   }
 
   static bool lastHadHands = false;
+
+  /// Bounding extent of the detected hand, in upright-frame pixels, and which
+  /// path found it. Diagnostics only — reported past the 226 dimensions the
+  /// model consumes and trimmed off before the tensor is built.
+  ///
+  /// The letters crop is stretched from `extent / 0.67` up to a 480-wide
+  /// canvas, so a small hand is upscaled enormously and the landmarker returns
+  /// 21 points on the interpolation regardless. These two numbers are what the
+  /// minimum-size gate will be set from, measured rather than assumed.
+  static double lastHandExtentPx = 0;
+  static bool lastHandFromTracker = false;
+
+  /// Smallest hand the letters model may be asked to read, in upright pixels.
+  ///
+  /// SET FROM MEASUREMENT, not from reasoning. Two runs were captured on the
+  /// same device minutes apart — one at a distance that emitted a stream of
+  /// P/Q/O with nothing being spelled, one close enough to spell correctly:
+  ///
+  ///     garbage   Q 22.2px (14.5x)   O 55.2px (5.8x)   O 60.7px (5.3x)
+  ///     real      A 63.6px (5.1x)    S 72.3px (4.4x)   B 118.6px (2.7x)
+  ///                                  ... 12 letters, 63.6-118.6px
+  ///
+  /// The two do not overlap. The crop is sized extent / LETTER_TARGET_SPAN and
+  /// stretched to a 480-wide canvas, so the upscale is 321.6 / extent: every
+  /// garbage letter came from above 5.3x and every real one from below 5.2x.
+  /// Past that the landmarker is reading interpolation, returns 21 points
+  /// anyway, and the letters model — which cannot know its input is mush —
+  /// settles on whichever classes own that degenerate region. Voting does not
+  /// help, because a stationary blur votes consistently.
+  ///
+  /// 62px sits between the two, and the margin is only ~3px on 15 samples, so
+  /// treat it as tuned rather than settled. It errs toward rejecting: a
+  /// rejected letter is recoverable in a second by moving closer, where an
+  /// accepted one has to be backspaced out of the word.
+  static const double minLetterExtentPx = 62.0;
+
+  /// Whether the hand is currently too small for fingerspelling to be read.
+  static bool get handTooFarForLetters =>
+      lastHandExtentPx > 0 && lastHandExtentPx < minLetterExtentPx;
   static double processingFps = 0;
 
   /// When a frame last completed processing, for the stream watchdog.
@@ -776,7 +815,13 @@ class InferenceService {
 
       if (raw == null || raw.length < landmarkDim) return null;
 
-      final lmList = List<double>.from(raw);
+      // Two diagnostic slots ride past the 226 the model uses; take them and
+      // trim, so nothing downstream ever sees a vector of the wrong width.
+      if (raw.length > landmarkDim) {
+        lastHandExtentPx = raw[landmarkDim];
+        lastHandFromTracker = raw[landmarkDim + 1] > 0.5;
+      }
+      final lmList = List<double>.from(raw.sublist(0, landmarkDim));
 
       // Snapshot before canonicalisation/normalisation mutate it — the overlay
       // needs the coordinates as MediaPipe actually reported them.
@@ -909,9 +954,22 @@ class InferenceService {
       TranslationResult? result;
 
       if (isLettersMode) {
-        final raw = _sawEmptyFrame ? runLettersInference(lmList) : null;
+        final tooFar = handTooFarForLetters;
+        final armed = _sawEmptyFrame && !tooFar;
+        final raw = armed ? runLettersInference(lmList) : null;
         if (!_sawEmptyFrame) {
           debugString = "> Lower your hands to begin spelling";
+        } else if (tooFar) {
+          // Say what to change. Silence here is indistinguishable from the app
+          // being broken, which is exactly how this was reported.
+          debugString = kDebugMode
+              ? "> Move your hand closer  "
+                  "(${lastHandExtentPx.toStringAsFixed(0)}px, "
+                  "need ${minLetterExtentPx.toStringAsFixed(0)})"
+              : "> Move your hand closer to the camera";
+          // Votes gathered at a readable distance must not combine with frames
+          // captured too far away.
+          _letterVotes.clear();
         }
         if (raw != null) {
           // Every frame used to be published straight to the screen, so one
@@ -937,6 +995,18 @@ class InferenceService {
             _gapFrames = 0;
             _letterVotes.clear();
             result = stable;
+          }
+
+          if (result != null) {
+            // Every committed letter, with the hand size that produced it.
+            // Comparing a run that spells correctly against one that emits
+            // P/Q/O is what sets the minimum extent.
+            TraceService.log('letter  ${result.label}  '
+                'conf=${result.confidence.toStringAsFixed(3)}  '
+                'extent=${lastHandExtentPx.toStringAsFixed(1)}px  '
+                'upscale=${lastHandExtentPx > 0 ? (321.6 / lastHandExtentPx).toStringAsFixed(1) : "-"}x  '
+                'tracked=${lastHandFromTracker ? 1 : 0}  '
+                'fps=${processingFps.toStringAsFixed(1)}');
           }
 
           final votes = _letterVotes.where((v) => v.label == raw.label).length;

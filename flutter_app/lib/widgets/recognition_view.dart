@@ -256,12 +256,6 @@ class _RecognitionViewState extends State<RecognitionView>
     } else {
       setState(() => _isLoadingModels = true);
       await InferenceService.initialize();
-      // Bring TTS up here rather than lazily on the first result, so a device
-      // with no voice installed reports it before the user signs anything.
-      await SpeechService.initTTS();
-      if (kDebugMode && !SpeechService.ttsAvailable) {
-        await SpeechService.ttsDiagnostics();
-      }
       if (!mounted) return;
       setState(() {
         _isLoadingModels = false;
@@ -269,13 +263,20 @@ class _RecognitionViewState extends State<RecognitionView>
         _translationLog.clear();
       });
       await TraceService.start('mode=${InferenceService.mode.name}');
-      TraceService.log('tts available=${SpeechService.ttsAvailable} '
-          'status=${SpeechService.ttsStatus} lang=${SpeechService.ttsLanguage}');
-      // The full list settles by measurement whether a Filipino voice is
-      // installed, instead of inferring it from how the output sounded.
-      TraceService.log('tts filipino installed='
-          '${SpeechService.filipinoInstalled}  '
-          'languages: ${SpeechService.ttsLanguages.join(", ")}');
+      // TTS is brought up AFTER the camera, and not awaited.
+      //
+      // A failing engine holds initTTS for many seconds — a rebind plus six
+      // 500ms polls plus several 5s deadlines — and blocking the camera behind
+      // it made pressing Start feel broken while the preview sat empty. Speech
+      // is output; nothing about capture depends on it.
+      unawaited(SpeechService.initTTS().then((_) {
+        TraceService.log('tts available=${SpeechService.ttsAvailable} '
+            'status=${SpeechService.ttsStatus} lang=${SpeechService.ttsLanguage}');
+        TraceService.log('tts filipino installed='
+            '${SpeechService.filipinoInstalled}  '
+            'languages: ${SpeechService.ttsLanguages.join(", ")}');
+        if (mounted) setState(() {});
+      }));
       _startWatchdog();
       _startPhraseTimer();
       await CameraService.startImageStream((CameraImage image) async {
@@ -364,6 +365,7 @@ class _RecognitionViewState extends State<RecognitionView>
             'hb  fps=${InferenceService.processingFps.toStringAsFixed(1)}'
             '  mode=${InferenceService.mode.name}'
             '  hands=${InferenceService.lastHadHands ? 1 : 0}'
+            '${InferenceService.isLettersMode ? "  extent=${InferenceService.lastHandExtentPx.toStringAsFixed(0)}px" : ""}'
             '  tts=${SpeechService.ttsAvailable ? "ok" : SpeechService.ttsStatus}');
       }
       final now = DateTime.now().millisecondsSinceEpoch;

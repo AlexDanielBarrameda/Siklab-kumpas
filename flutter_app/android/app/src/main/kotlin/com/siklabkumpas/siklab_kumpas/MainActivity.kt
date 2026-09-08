@@ -255,6 +255,26 @@ class MainActivity : FlutterActivity() {
      * rectangle and go straight to the second pass, re-acquiring on the full frame
      * only when tracking fails or periodically to stop the box drifting.
      */
+    /**
+     * Diagnostics for the letters path, reported back to Dart as two extra
+     * slots on the landmark array.
+     *
+     * The letters crop is sized extent / LETTER_TARGET_SPAN and then stretched
+     * to CANVAS_W, so the upscale factor is 0.67 * 480 / extent — about 3x for
+     * a hand 100px across and 8x for one at 40px. The only guard is
+     * `extent < 4f`, which permits a 16x blow-up of a four-pixel blob.
+     * MediaPipe returns 21 landmarks on the interpolation regardless and the
+     * letters model, which cannot know its input is mush, lands on whichever
+     * classes own that degenerate region — reported on device as a stream of
+     * P, Q and O that only stops when the hand is very close to the lens.
+     *
+     * Measured here rather than guessed: [handExtentPx] is the hand's bounding
+     * extent in upright pixels and [handFromTracker] says whether the reading
+     * came from the reused crop rectangle or a fresh full-frame acquisition.
+     */
+    private var handExtentPx = 0f
+    private var handFromTracker = false
+
     private val REACQUIRE_EVERY_N = 6
     private var trackedRect: Rect? = null
     private var trackedFrame = -1L
@@ -744,6 +764,7 @@ class MainActivity : FlutterActivity() {
         }
         val extent = maxOf(maxX - minX, maxY - minY)
         if (extent < 4f) return null
+        handExtentPx = extent
         val cx = (minX + maxX) / 2f
         val cy = (minY + maxY) / 2f
         val half = (extent / LETTER_TARGET_SPAN) / 2f
@@ -782,6 +803,7 @@ class MainActivity : FlutterActivity() {
         val cy = (minY + maxY) / 2f
         val extent = maxOf(maxX - minX, maxY - minY)
         if (extent < 4f) return null
+        handExtentPx = extent
 
         val half = (extent / LETTER_TARGET_SPAN) / 2f
         val left = maxOf(0, (cx - half).toInt())
@@ -818,7 +840,7 @@ class MainActivity : FlutterActivity() {
         rotation: Int, mirror: Boolean, lettersMode: Boolean,
         handBlock: String, debug: Boolean
     ): DoubleArray {
-        val output = DoubleArray(226)
+        val output = DoubleArray(228)
         frameCounter++
 
         val t0 = System.nanoTime()
@@ -852,6 +874,8 @@ class MainActivity : FlutterActivity() {
         var handResult: HandLandmarkerResult? = null
         var cropped = false
         var tracked = false
+        handExtentPx = 0f
+        handFromTracker = false
 
         // Fast path: reuse the previous crop rectangle and run a single detection
         // on it, skipping the full-frame pass entirely.
@@ -867,6 +891,7 @@ class MainActivity : FlutterActivity() {
                         handResult = r
                         cropped = true
                         tracked = true
+                        handFromTracker = true
                         rectFromCropResult(r, rect)?.let { trackedRect = it }
                     }
                 }
@@ -1023,6 +1048,10 @@ class MainActivity : FlutterActivity() {
         for (i in 0 until 63) output[i] = lh[i].toDouble()
         for (i in 0 until 63) output[63 + i] = rh[i].toDouble()
         for (i in 0 until 100) output[126 + i] = pose[i].toDouble()
+        // Diagnostics, past the 226 the model uses. Dart trims before the
+        // tensor is built, so nothing downstream sees them.
+        output[226] = handExtentPx.toDouble()
+        output[227] = if (handFromTracker) 1.0 else 0.0
 
         // Logged on a prime-ish cadence so it does not always land on the same
         // phase of the pose cache cycle, which hid the real pose cost last time.
