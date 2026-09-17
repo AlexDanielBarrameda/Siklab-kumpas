@@ -1,14 +1,18 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_tts/flutter_tts.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 class SpeechService {
   static final FlutterTts _tts = FlutterTts();
-  static final stt.SpeechToText _stt = stt.SpeechToText();
-  static bool _sttInitialized = false;
+
+  // Speech INPUT does not live here any more. Every system recognition path
+  // on the target device failed (see OfflineSpeechService), and the one that
+  // partly worked sent audio to Google — the single component of this app that
+  // was not on-device. Voice input is Vosk, bundled, and the INTERNET
+  // permission is gone from the release manifest, so "fully offline" is now a
+  // property a reviewer can verify rather than a claim they have to take on
+  // trust.
 
   /// Platform speech rate that sounds like normal speaking pace.
   ///
@@ -547,176 +551,8 @@ class SpeechService {
     }
   }
 
-  static Future<bool> initSTT() async {
-    if (_sttInitialized) return true;
-    try {
-      debugPrint('Initializing STT...');
-      _sttInitialized = await _stt.initialize();
-      debugPrint('STT initialized: $_sttInitialized');
-      debugPrint('STT available: ${_stt.isAvailable}');
-    } catch (e) {
-      debugPrint('STT init error: $e');
-    }
-    return _sttInitialized;
-  }
-
-  static Future<void> startListening({
-    required Function(String text) onResult,
-    String lang = 'en',
-    void Function(String reason)? onFailure,
-  }) async {
-    if (!_sttInitialized) await initSTT();
-    debugPrint('STT available: ${_stt.isAvailable}');
-    debugPrint('STT listening: ${_stt.isListening}');
-    if (!_stt.isAvailable) {
-      debugPrint('STT not available on this device');
-      onFailure?.call('No speech recogniser on this device');
-      return;
-    }
-
-    // Always tear down any previous session first. Starting a second listen
-    // over a live one is the fastest way to be throttled.
-    try {
-      if (_stt.isListening) await _stt.cancel();
-    } catch (_) {}
-
-    final sinceLast = DateTime.now().millisecondsSinceEpoch - _lastListenMs;
-    if (sinceLast < _sttMinGapMs) {
-      await Future<void>.delayed(
-          Duration(milliseconds: _sttMinGapMs - sinceLast));
-    }
-    _lastListenMs = DateTime.now().millisecondsSinceEpoch;
-
-    final locale = lang == 'fil' ? 'fil-PH' : 'en-US';
-    debugPrint('Starting STT with locale: $locale');
-
-    await _stt.listen(
-      onResult: (result) {
-        debugPrint('STT result: ${result.recognizedWords} final: ${result.finalResult}');
-        if (result.finalResult) {
-          onResult(result.recognizedWords);
-        }
-      },
-      // Bounded, so the UI cannot sit on "Listening..." forever. Without
-      // these the plugin waits indefinitely and a device whose recogniser
-      // never responds looks identical to one that is simply still listening.
-      listenOptions: stt.SpeechListenOptions(
-        localeId: locale,
-        listenMode: stt.ListenMode.confirmation,
-        cancelOnError: true,
-        listenFor: const Duration(seconds: 12),
-        pauseFor: const Duration(seconds: 4),
-        // Online recognition, deliberately.
-        //
-        // onDevice: true was tried and this device cannot honour it: the
-        // Redmi offers no offline language pack to download, and the request
-        // still reached the network. Speech-to-text therefore sends audio to
-        // Google, which is the one part of this app that is not on-device and
-        // must be stated as such — every other path, camera included, runs
-        // entirely offline.
-        onDevice: false,
-      ),
-    );
-
-    // The plugin reports errors and status through these streams rather than
-    // through listen(), so a failure is invisible without them.
-    //
-    // Both are guarded by a settling window. speech_to_text emits
-    // "notListening" once at startup, BEFORE listening actually begins, so
-    // acting on it immediately turned the microphone button off the instant it
-    // was pressed — the button appeared to un-click itself and the mic never
-    // opened. Anything arriving in the first [_sttSettleMs] is startup noise.
-    final startedAt = DateTime.now().millisecondsSinceEpoch;
-    bool settled() =>
-        DateTime.now().millisecondsSinceEpoch - startedAt > _sttSettleMs;
-
-    _stt.errorListener = (e) {
-      debugPrint('STT error: ${e.errorMsg} permanent=${e.permanent}');
-      // Errors are real even during startup — a missing recogniser fails at
-      // once — so these are not gated on settling.
-      onFailure?.call(_describeSttError(e.errorMsg));
-    };
-    _stt.statusListener = (status) {
-      debugPrint('STT status: $status');
-      if (!settled()) return;
-      if (status == 'done' || status == 'notListening') {
-        onFailure?.call('');      // empty reason = just stopped, not an error
-      }
-    };
-  }
-
-  /// How long after listen() starts to ignore status callbacks.
-  ///
-  /// speech_to_text reports "notListening" once during start-up, so without a
-  /// settling window the very first status event cancels the session that has
-  /// only just begun.
-  static const int _sttSettleMs = 1200;
-
-  /// When listening last started, and the shortest gap between attempts.
-  ///
-  /// error_too_many_requests is Google throttling the CLIENT, not a quota on
-  /// the account: rapid start/stop cycles trip it, and once tripped it keeps
-  /// failing for a while. Tab switches, double taps and the old status
-  /// listener were each firing listen() in quick succession. Spacing the
-  /// attempts is what makes the online path usable rather than intermittent.
-  static int _lastListenMs = 0;
-  static const int _sttMinGapMs = 1500;
-
-  /// Turns a plugin error code into something a user can act on.
-  static String _describeSttError(String code) {
-    switch (code) {
-      case 'error_no_match':
-        return 'Did not catch that — try again';
-      case 'error_speech_timeout':
-        return 'No speech heard — try again';
-      case 'error_audio':
-        return 'Microphone unavailable';
-      case 'error_permission':
-        return 'Microphone permission denied';
-      case 'error_network':
-      case 'error_network_timeout':
-        return 'Speech recognition needs a network connection';
-      case 'error_busy':
-        return 'Speech recogniser is busy';
-      case 'error_too_many_requests':
-        return 'Rate limited — wait a few seconds and try again';
-      case 'error_client':
-        return 'No usable speech recogniser on this device';
-      default:
-        return 'Speech recognition failed ($code)';
-    }
-  }
-
-  /// Speech input via the system's recognition ACTIVITY.
-  ///
-  /// The plugin binds android.speech.RecognitionService directly, and Google
-  /// throttles that path on this device with error_too_many_requests
-  /// regardless of how far apart the requests are. The activity route is the
-  /// one the keyboard microphone uses and is not subject to the same limit,
-  /// so it is the fallback when the direct path refuses.
-  ///
-  /// Returns the recognised text, or null when the user cancelled or nothing
-  /// was heard. Throws only when no speech input app exists at all.
-  static Future<String?> listenViaActivity({String lang = 'en'}) async {
-    const channel = MethodChannel('com.siklabkumpas/inference');
-    final locale = lang == 'fil' ? 'fil-PH' : 'en-US';
-    try {
-      return await channel.invokeMethod<String>(
-          'listenViaActivity', {'lang': locale});
-    } on PlatformException catch (e) {
-      debugPrint('listenViaActivity failed: ${e.code} ${e.message}');
-      rethrow;
-    }
-  }
-
-  static Future<void> stopListening() async {
-    await _stt.stop();
-  }
-
-  static bool get isListening => _stt.isListening;
 
   static void dispose() {
     _tts.stop();
-    _stt.stop();
   }
 }

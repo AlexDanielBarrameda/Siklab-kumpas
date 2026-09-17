@@ -618,37 +618,61 @@ class _RecognitionViewState extends State<RecognitionView>
               color: c.orange,
             ),
 
-            // LIVE badge
+            // Idle dim. Under the badges so they stay legible, over the feed
+            // so the state is unmistakable — and animated, so the transition
+            // reads as a deliberate change rather than a glitch.
+            if (_isDetecting)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 350),
+                    color: InferenceService.isIdle
+                        ? Colors.black.withValues(alpha: 0.38)
+                        : Colors.transparent,
+                  ),
+                ),
+              ),
+
+            // LIVE / IDLE badge
             Positioned(
               top: 12,
               left: 12,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: _isDetecting ? Colors.red : Colors.black54,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.circle,
-                      color: _isDetecting ? Colors.white : Colors.white38,
-                      size: 8,
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      'LIVE',
-                      style: TextStyle(
-                        color: _isDetecting ? Colors.white : Colors.white38,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
+              child: Builder(builder: (_) {
+                final idle = _isDetecting && InferenceService.isIdle;
+                final fg = _isDetecting ? Colors.white : Colors.white38;
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 350),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: !_isDetecting
+                        ? Colors.black54
+                        : idle
+                            ? const Color(0xFFD98E04)   // amber: on, but resting
+                            : Colors.red,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        idle ? Icons.pause_rounded : Icons.circle,
+                        color: fg,
+                        size: idle ? 11 : 8,
                       ),
-                    ),
-                  ],
-                ),
-              ),
+                      const SizedBox(width: 5),
+                      Text(
+                        idle ? 'IDLE' : 'LIVE',
+                        style: TextStyle(
+                          color: fg,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
             ),
 
             // Camera controls.

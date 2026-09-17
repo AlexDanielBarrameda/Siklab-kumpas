@@ -683,6 +683,40 @@ class InferenceService {
   static int lastProcessedAtMs = 0;
   static int _lastFrameTime = 0;
 
+  /// How long without hands before the camera drops to the idle stride.
+  ///
+  /// Must exceed PhraseService.phraseGapMs (5000): a phrase is a sequence of
+  /// signs with hands DOWN between them, and idling inside one would put the
+  /// pipeline to sleep exactly when the next sign is about to start. 6s sits
+  /// just past that gap, so idle only ever begins after a phrase has already
+  /// been spoken.
+  static const int idleAfterMs = 6000;
+
+  /// Whether the camera is currently on the idle stride.
+  static bool isIdle = false;
+
+  /// When hands were last seen, or when the session began — whichever is
+  /// later. Separate from _lastHandSeenMs, whose zero value means "never" and
+  /// drives the end-of-sign logic; this one must start counting from stream
+  /// start so a session that opens with nobody in frame still idles.
+  static int _idleAnchorMs = 0;
+
+  static void _enterIdle(int sinceMs) {
+    if (isIdle) return;
+    isIdle = true;
+    CameraService.setIdle(true);
+    TraceService.log('idle  entered after ${sinceMs}ms without hands');
+  }
+
+  /// Instant, on the first frame with a hand. A false wake costs a little heat;
+  /// a slow wake costs sign onset every time.
+  static void _wake(String why) {
+    if (!isIdle) return;
+    isIdle = false;
+    CameraService.setIdle(false);
+    TraceService.log('idle  woke ($why)');
+  }
+
   /// How long the hands may be absent before the buffer is abandoned.
   ///
   /// This was the last frame-count threshold left, and it tightened as the
@@ -891,9 +925,15 @@ class InferenceService {
         // The scene has proved it can report "no hand", so anything detected
         // from here on entered the frame rather than being there already.
         _sawEmptyFrame = true;
-        final goneMs = _lastHandSeenMs == 0
-            ? 0
-            : DateTime.now().millisecondsSinceEpoch - _lastHandSeenMs;
+        final nowMs = DateTime.now().millisecondsSinceEpoch;
+        final goneMs = _lastHandSeenMs == 0 ? 0 : nowMs - _lastHandSeenMs;
+
+        // Idle is decided here, before the end-of-sign logic below, and that
+        // is safe: a word is decided within wordEndSilenceMs (800ms) of the
+        // hands leaving, so by 6s the buffer has long since been emptied.
+        if (_idleAnchorMs == 0) _idleAnchorMs = nowMs;
+        final sinceAnyHandMs = nowMs - _idleAnchorMs;
+        if (sinceAnyHandMs >= idleAfterMs) _enterIdle(sinceAnyHandMs);
 
         // LETTERS: hands down ends the word.
         if (isLettersMode && spelledWord.isNotEmpty && _lastHandAt != 0 &&
@@ -926,17 +966,21 @@ class InferenceService {
           _frameBuffer.clear();
           _sawRaised = false;
         }
-        debugString = abandon
-            ? "> Ready — sign, then lower your hands"
-            : kDebugMode
-                ? "> hands out of frame (${goneMs}ms) — still holding "
-                    "${_frameBuffer.length} frames"
-                : "> Waiting...";
+        debugString = isIdle
+            ? "> Idle — raise your hands to begin"
+            : abandon
+                ? "> Ready — sign, then lower your hands"
+                : kDebugMode
+                    ? "> hands out of frame (${goneMs}ms) — still holding "
+                        "${_frameBuffer.length} frames"
+                    : "> Waiting...";
         return null;
       }
 
       final now = DateTime.now();
       _lastHandSeenMs = now.millisecondsSinceEpoch;
+      _idleAnchorMs = now.millisecondsSinceEpoch;
+      _wake('hands');
 
       // Per-frame trace. Two frames per sign has been reported even when
       // filming the source dataset videos, which cannot be a signing-style
@@ -1521,6 +1565,10 @@ class InferenceService {
     // skips — and since mode switching calls clearBuffer, that silently
     // disabled recovery for the rest of the session.
     lastProcessedAtMs = DateTime.now().millisecondsSinceEpoch;
+    // Every reset — stop/start, mode switch, camera switch, watchdog — begins
+    // awake, and the idle clock counts from now.
+    _idleAnchorMs = lastProcessedAtMs;
+    _wake('reset');
   }
 
   /// How many times the watchdog has had to restart the image stream.

@@ -72,7 +72,6 @@ class _HearingUserScreenState extends State<HearingUserScreen> {
       if (!mounted) return;
       afterRouteTransition(context, () async {
         if (!mounted) return;
-        await SpeechService.initSTT();
         await SpeechService.initTTS();
         if (!mounted) return;
         // After speech bring-up, so the dialog is not competing with it.
@@ -320,7 +319,7 @@ class _HearingUserScreenState extends State<HearingUserScreen> {
   Future<void> _switchTab(_HubTab next) async {
     if (_tab == next) return;
     if (_isListening) {
-      await SpeechService.stopListening();
+      await OfflineSpeechService.stop();
     }
     if (!mounted) return;
     setState(() {

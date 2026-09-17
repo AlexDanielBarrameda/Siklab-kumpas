@@ -13,7 +13,33 @@ class CameraService {
   /// Only every Nth frame is handed to Dart. The inference pipeline drops frames
   /// on its own while busy, but delivering every frame still costs a plane copy
   /// across the platform boundary, so we halve that traffic up front.
-  static const int _frameStride = 2;
+  static const int activeStride = 2;
+
+  /// Stride while nobody is signing.
+  ///
+  /// The phone heats from 36.5C to 41.3C over five minutes of continuous
+  /// capture and the frame rate falls 13.2 -> 5.6 fps with it, and most of a
+  /// demonstration is spent NOT signing — setting up, talking, waiting. Those
+  /// stretches were running the full pipeline for nothing. Halving the frames
+  /// during them takes the largest share of the heat out.
+  ///
+  /// The cost is real and deliberately accepted: the pipeline cannot notice
+  /// hands until it next looks, so the FIRST sign after a rest loses up to
+  /// (idleStride / camera fps) of its onset — about 267ms, roughly two frames,
+  /// at 15 fps. Signs 2+ of a phrase are unaffected because the pipeline is
+  /// already awake by then. The trace records frames per decision, so the cost
+  /// is measurable rather than argued about.
+  static const int idleStride = 4;
+
+  static int _stride = activeStride;
+
+  static bool get isIdle => _stride == idleStride;
+
+  /// Switches the delivery rate. Cheap and immediate — the next frame that
+  /// arrives is counted against the new stride.
+  static void setIdle(bool idle) {
+    _stride = idle ? idleStride : activeStride;
+  }
 
   static bool get isInitialized => _isInitialized;
   static CameraController? get controller => _controller;
@@ -126,10 +152,12 @@ class CameraService {
 
     _onFrame = onFrame;
     _frameCount = 0;
+    // A fresh stream always starts awake.
+    _stride = activeStride;
 
     await _controller!.startImageStream((image) {
       _frameCount++;
-      if (_frameCount % _frameStride == 0) {
+      if (_frameCount % _stride == 0) {
         onFrame(image);
       }
     });

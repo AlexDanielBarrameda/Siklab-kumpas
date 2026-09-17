@@ -3,7 +3,6 @@ package com.siklabkumpas.siklab_kumpas
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import android.speech.RecognizerIntent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -166,29 +165,6 @@ class MainActivity : FlutterActivity() {
 
     private var frameCounter = 0L
 
-    /** Pending reply for [listenViaActivity], answered in onActivityResult. */
-    private var speechResult: MethodChannel.Result? = null
-    private val SPEECH_REQUEST = 4711
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        if (requestCode == SPEECH_REQUEST) {
-            val pending = speechResult
-            speechResult = null
-            if (pending != null) {
-                val text = if (resultCode == Activity.RESULT_OK && data != null) {
-                    data.getStringArrayListExtra(
-                        RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
-                } else {
-                    null
-                }
-                // null means cancelled or heard nothing; the Dart side treats
-                // that as "try again" rather than as an error.
-                pending.success(text)
-            }
-            return
-        }
-        super.onActivityResult(requestCode, resultCode, data)
-    }
 
     /**
      * Pose runs on EVERY frame, concurrently with the hand work.
@@ -337,53 +313,6 @@ class MainActivity : FlutterActivity() {
                     }
                 }
 
-                /**
-                 * Speech input via the system's recognition ACTIVITY.
-                 *
-                 * speech_to_text binds android.speech.RecognitionService
-                 * directly, and on this device that path is throttled by
-                 * Google with error_too_many_requests no matter how far the
-                 * requests are spaced. The activity route is what the keyboard
-                 * microphone uses, and it is not subject to the same limit.
-                 *
-                 * The trade is that the system shows its own listening dialog
-                 * rather than the in-app button — worse to look at, but it
-                 * returns text, which the other path does not.
-                 */
-                "listenViaActivity" -> {
-                    val lang = call.argument<String>("lang") ?: "en-US"
-                    if (speechResult != null) {
-                        result.error("BUSY", "already listening", null)
-                        return@setMethodCallHandler
-                    }
-                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                            RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                        putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
-                        putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-                        putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
-                        // Prefer the on-device model where one exists, so this
-                        // stays local when the device can manage it.
-                        putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
-                    }
-                    // Prefer Google's handler explicitly. Left to the system,
-                    // this resolves to MIUI's AsrActivity — the only other
-                    // handler registered here — which errors out and closes.
-                    val pm = packageManager
-                    val google = "com.google.android.tts"
-                    val hasGoogle = pm.queryIntentActivities(intent, 0)
-                        .any { it.activityInfo?.packageName == google }
-                    if (hasGoogle) intent.setPackage(google)
-
-                    try {
-                        speechResult = result
-                        startActivityForResult(intent, SPEECH_REQUEST)
-                    } catch (e: Exception) {
-                        speechResult = null
-                        result.error("NO_ACTIVITY",
-                            "No speech input app on this device", null)
-                    }
-                }
 
                 /**
                  * App-private files directory, for small persistent flags.
