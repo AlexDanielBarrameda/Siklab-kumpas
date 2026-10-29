@@ -5,11 +5,12 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   flutter_tts
   permission_handler_windows
-  speech_to_text_windows
+  vosk_flutter_service
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST
   jni
+  tflite_flutter
 )
 
 set(PLUGIN_BUNDLED_LIBRARIES)

@@ -1,0 +1,206 @@
+classes 200   train 2,977  val 743  test 2,431  (test signers are disjoint from train)
+train after augmentation: (8931, 30, 226)  (ASL calibration: {'scale_range': (0.7, 1.4), 'keep_frames': (4, 15), 'drop_prob': 0.85, 'frame_range': (0.5, 1.05)})
+C:\Users\Dan\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\layers\rnn\rnn.py:199: UserWarning: Do not pass an `input_shape`/`input_dim` argument to a layer. When using Sequential models, prefer using an `Input(shape)` object as the first layer in the model instead.
+  super().__init__(**kwargs)
+Epoch 1/120
+280/280 - 18s - 64ms/step - accuracy: 0.0162 - loss: 5.0409 - val_accuracy: 0.0202 - val_loss: 4.8140 - learning_rate: 0.0010
+Epoch 2/120
+280/280 - 6s - 20ms/step - accuracy: 0.0614 - loss: 4.1998 - val_accuracy: 0.0834 - val_loss: 4.0200 - learning_rate: 0.0010
+Epoch 3/120
+280/280 - 6s - 22ms/step - accuracy: 0.1072 - loss: 3.6602 - val_accuracy: 0.1009 - val_loss: 3.9360 - learning_rate: 0.0010
+Epoch 4/120
+280/280 - 7s - 25ms/step - accuracy: 0.1744 - loss: 3.2473 - val_accuracy: 0.1090 - val_loss: 3.6925 - learning_rate: 0.0010
+Epoch 5/120
+280/280 - 7s - 25ms/step - accuracy: 0.2168 - loss: 2.9258 - val_accuracy: 0.2651 - val_loss: 2.7852 - learning_rate: 0.0010
+Epoch 6/120
+280/280 - 7s - 24ms/step - accuracy: 0.2731 - loss: 2.6379 - val_accuracy: 0.1454 - val_loss: 3.4595 - learning_rate: 0.0010
+Epoch 7/120
+280/280 - 6s - 21ms/step - accuracy: 0.3155 - loss: 2.4398 - val_accuracy: 0.1736 - val_loss: 3.4646 - learning_rate: 0.0010
+Epoch 8/120
+280/280 - 7s - 25ms/step - accuracy: 0.3715 - loss: 2.2004 - val_accuracy: 0.2853 - val_loss: 2.7036 - learning_rate: 0.0010
+Epoch 9/120
+280/280 - 7s - 25ms/step - accuracy: 0.4014 - loss: 2.0795 - val_accuracy: 0.3257 - val_loss: 2.6260 - learning_rate: 0.0010
+Epoch 10/120
+280/280 - 7s - 24ms/step - accuracy: 0.4321 - loss: 1.9652 - val_accuracy: 0.3742 - val_loss: 2.2262 - learning_rate: 0.0010
+Epoch 11/120
+280/280 - 7s - 24ms/step - accuracy: 0.4575 - loss: 1.8884 - val_accuracy: 0.3620 - val_loss: 2.4535 - learning_rate: 0.0010
+Epoch 12/120
+280/280 - 7s - 24ms/step - accuracy: 0.4863 - loss: 1.7311 - val_accuracy: 0.3997 - val_loss: 2.0672 - learning_rate: 0.0010
+Epoch 13/120
+280/280 - 7s - 24ms/step - accuracy: 0.5062 - loss: 1.6318 - val_accuracy: 0.2853 - val_loss: 3.1173 - learning_rate: 0.0010
+Epoch 14/120
+280/280 - 7s - 24ms/step - accuracy: 0.5350 - loss: 1.5344 - val_accuracy: 0.3863 - val_loss: 2.3936 - learning_rate: 0.0010
+Epoch 15/120
+280/280 - 7s - 24ms/step - accuracy: 0.5454 - loss: 1.4976 - val_accuracy: 0.3701 - val_loss: 2.4999 - learning_rate: 0.0010
+Epoch 16/120
+280/280 - 7s - 24ms/step - accuracy: 0.5648 - loss: 1.4300 - val_accuracy: 0.3284 - val_loss: 2.8306 - learning_rate: 0.0010
+Epoch 17/120
+280/280 - 7s - 25ms/step - accuracy: 0.5900 - loss: 1.3354 - val_accuracy: 0.5128 - val_loss: 1.8744 - learning_rate: 0.0010
+Epoch 18/120
+280/280 - 7s - 25ms/step - accuracy: 0.5995 - loss: 1.2938 - val_accuracy: 0.5061 - val_loss: 1.8646 - learning_rate: 0.0010
+Epoch 19/120
+280/280 - 7s - 25ms/step - accuracy: 0.5909 - loss: 1.3166 - val_accuracy: 0.5357 - val_loss: 1.7201 - learning_rate: 0.0010
+Epoch 20/120
+280/280 - 7s - 25ms/step - accuracy: 0.6267 - loss: 1.2031 - val_accuracy: 0.6178 - val_loss: 1.3054 - learning_rate: 0.0010
+Epoch 21/120
+280/280 - 6s - 21ms/step - accuracy: 0.6369 - loss: 1.1653 - val_accuracy: 0.3647 - val_loss: 3.1351 - learning_rate: 0.0010
+Epoch 22/120
+280/280 - 5s - 19ms/step - accuracy: 0.5736 - loss: 1.4577 - val_accuracy: 0.5330 - val_loss: 1.7390 - learning_rate: 0.0010
+Epoch 23/120
+280/280 - 5s - 19ms/step - accuracy: 0.6340 - loss: 1.1716 - val_accuracy: 0.5680 - val_loss: 1.5915 - learning_rate: 0.0010
+Epoch 24/120
+280/280 - 5s - 19ms/step - accuracy: 0.6510 - loss: 1.1017 - val_accuracy: 0.5814 - val_loss: 1.5648 - learning_rate: 0.0010
+Epoch 25/120
+280/280 - 5s - 19ms/step - accuracy: 0.6558 - loss: 1.1042 - val_accuracy: 0.5774 - val_loss: 1.6088 - learning_rate: 0.0010
+Epoch 26/120
+280/280 - 5s - 18ms/step - accuracy: 0.6584 - loss: 1.0649 - val_accuracy: 0.5599 - val_loss: 1.7129 - learning_rate: 0.0010
+Epoch 27/120
+280/280 - 5s - 19ms/step - accuracy: 0.7140 - loss: 0.8992 - val_accuracy: 0.7066 - val_loss: 1.0102 - learning_rate: 5.0000e-04
+Epoch 28/120
+280/280 - 5s - 19ms/step - accuracy: 0.7239 - loss: 0.8673 - val_accuracy: 0.7187 - val_loss: 1.0537 - learning_rate: 5.0000e-04
+Epoch 29/120
+280/280 - 5s - 19ms/step - accuracy: 0.7344 - loss: 0.8231 - val_accuracy: 0.6851 - val_loss: 1.1801 - learning_rate: 5.0000e-04
+Epoch 30/120
+280/280 - 5s - 19ms/step - accuracy: 0.7286 - loss: 0.8409 - val_accuracy: 0.6783 - val_loss: 1.1540 - learning_rate: 5.0000e-04
+Epoch 31/120
+280/280 - 5s - 19ms/step - accuracy: 0.7368 - loss: 0.8021 - val_accuracy: 0.6851 - val_loss: 1.1176 - learning_rate: 5.0000e-04
+Epoch 32/120
+280/280 - 5s - 19ms/step - accuracy: 0.7399 - loss: 0.7997 - val_accuracy: 0.7120 - val_loss: 1.1142 - learning_rate: 5.0000e-04
+Epoch 33/120
+280/280 - 5s - 19ms/step - accuracy: 0.7364 - loss: 0.8092 - val_accuracy: 0.6541 - val_loss: 1.2224 - learning_rate: 5.0000e-04
+Epoch 34/120
+280/280 - 5s - 19ms/step - accuracy: 0.7529 - loss: 0.7606 - val_accuracy: 0.7295 - val_loss: 1.0117 - learning_rate: 2.5000e-04
+Epoch 35/120
+280/280 - 6s - 23ms/step - accuracy: 0.7683 - loss: 0.6953 - val_accuracy: 0.7147 - val_loss: 1.0631 - learning_rate: 2.5000e-04
+Epoch 36/120
+280/280 - 7s - 25ms/step - accuracy: 0.7775 - loss: 0.6888 - val_accuracy: 0.7402 - val_loss: 1.0089 - learning_rate: 2.5000e-04
+Epoch 37/120
+280/280 - 7s - 25ms/step - accuracy: 0.7755 - loss: 0.6836 - val_accuracy: 0.7335 - val_loss: 0.9931 - learning_rate: 2.5000e-04
+Epoch 38/120
+280/280 - 7s - 26ms/step - accuracy: 0.7731 - loss: 0.6870 - val_accuracy: 0.7026 - val_loss: 1.1436 - learning_rate: 2.5000e-04
+Epoch 39/120
+280/280 - 7s - 25ms/step - accuracy: 0.7786 - loss: 0.6862 - val_accuracy: 0.7429 - val_loss: 0.9382 - learning_rate: 2.5000e-04
+Epoch 40/120
+280/280 - 7s - 25ms/step - accuracy: 0.7841 - loss: 0.6648 - val_accuracy: 0.7416 - val_loss: 0.9656 - learning_rate: 2.5000e-04
+Epoch 41/120
+280/280 - 7s - 25ms/step - accuracy: 0.7643 - loss: 0.7054 - val_accuracy: 0.7160 - val_loss: 1.0121 - learning_rate: 2.5000e-04
+Epoch 42/120
+280/280 - 7s - 25ms/step - accuracy: 0.7737 - loss: 0.6662 - val_accuracy: 0.7349 - val_loss: 1.0717 - learning_rate: 2.5000e-04
+Epoch 43/120
+280/280 - 7s - 25ms/step - accuracy: 0.7845 - loss: 0.6495 - val_accuracy: 0.7349 - val_loss: 0.9785 - learning_rate: 2.5000e-04
+Epoch 44/120
+280/280 - 5s - 19ms/step - accuracy: 0.7898 - loss: 0.6443 - val_accuracy: 0.7564 - val_loss: 0.9851 - learning_rate: 2.5000e-04
+Epoch 45/120
+280/280 - 6s - 21ms/step - accuracy: 0.7869 - loss: 0.6385 - val_accuracy: 0.7349 - val_loss: 1.0783 - learning_rate: 2.5000e-04
+Epoch 46/120
+280/280 - 6s - 22ms/step - accuracy: 0.7940 - loss: 0.6253 - val_accuracy: 0.7645 - val_loss: 0.9283 - learning_rate: 1.2500e-04
+Epoch 47/120
+280/280 - 6s - 22ms/step - accuracy: 0.8004 - loss: 0.5977 - val_accuracy: 0.7577 - val_loss: 0.9406 - learning_rate: 1.2500e-04
+Epoch 48/120
+280/280 - 6s - 22ms/step - accuracy: 0.7978 - loss: 0.6090 - val_accuracy: 0.7564 - val_loss: 0.9501 - learning_rate: 1.2500e-04
+Epoch 49/120
+280/280 - 6s - 21ms/step - accuracy: 0.7988 - loss: 0.6056 - val_accuracy: 0.7631 - val_loss: 0.9555 - learning_rate: 1.2500e-04
+Epoch 50/120
+280/280 - 5s - 18ms/step - accuracy: 0.8024 - loss: 0.6116 - val_accuracy: 0.7497 - val_loss: 0.9405 - learning_rate: 1.2500e-04
+Epoch 51/120
+280/280 - 5s - 18ms/step - accuracy: 0.8069 - loss: 0.5894 - val_accuracy: 0.7752 - val_loss: 0.9268 - learning_rate: 1.2500e-04
+Epoch 52/120
+280/280 - 5s - 18ms/step - accuracy: 0.8116 - loss: 0.5640 - val_accuracy: 0.7497 - val_loss: 0.9641 - learning_rate: 1.2500e-04
+Epoch 53/120
+280/280 - 5s - 18ms/step - accuracy: 0.8032 - loss: 0.5930 - val_accuracy: 0.7550 - val_loss: 0.9469 - learning_rate: 1.2500e-04
+Epoch 54/120
+280/280 - 5s - 18ms/step - accuracy: 0.8090 - loss: 0.5664 - val_accuracy: 0.7618 - val_loss: 0.9108 - learning_rate: 1.2500e-04
+Epoch 55/120
+280/280 - 5s - 18ms/step - accuracy: 0.8061 - loss: 0.5757 - val_accuracy: 0.7712 - val_loss: 0.9618 - learning_rate: 1.2500e-04
+Epoch 56/120
+280/280 - 5s - 18ms/step - accuracy: 0.8091 - loss: 0.5626 - val_accuracy: 0.7779 - val_loss: 0.8770 - learning_rate: 1.2500e-04
+Epoch 57/120
+280/280 - 5s - 18ms/step - accuracy: 0.8038 - loss: 0.5822 - val_accuracy: 0.7604 - val_loss: 0.8941 - learning_rate: 1.2500e-04
+Epoch 58/120
+280/280 - 5s - 18ms/step - accuracy: 0.8128 - loss: 0.5562 - val_accuracy: 0.7618 - val_loss: 0.9098 - learning_rate: 1.2500e-04
+Epoch 59/120
+280/280 - 5s - 19ms/step - accuracy: 0.8141 - loss: 0.5550 - val_accuracy: 0.7591 - val_loss: 0.9373 - learning_rate: 1.2500e-04
+Epoch 60/120
+280/280 - 6s - 22ms/step - accuracy: 0.8075 - loss: 0.5726 - val_accuracy: 0.7793 - val_loss: 0.8846 - learning_rate: 1.2500e-04
+Epoch 61/120
+280/280 - 5s - 18ms/step - accuracy: 0.8129 - loss: 0.5554 - val_accuracy: 0.7631 - val_loss: 0.9717 - learning_rate: 1.2500e-04
+Epoch 62/120
+280/280 - 5s - 18ms/step - accuracy: 0.8149 - loss: 0.5524 - val_accuracy: 0.7537 - val_loss: 0.9740 - learning_rate: 1.2500e-04
+Epoch 63/120
+280/280 - 5s - 18ms/step - accuracy: 0.8156 - loss: 0.5495 - val_accuracy: 0.7618 - val_loss: 0.8964 - learning_rate: 6.2500e-05
+Epoch 64/120
+280/280 - 5s - 18ms/step - accuracy: 0.8212 - loss: 0.5274 - val_accuracy: 0.7712 - val_loss: 0.8966 - learning_rate: 6.2500e-05
+Epoch 65/120
+280/280 - 5s - 18ms/step - accuracy: 0.8254 - loss: 0.5266 - val_accuracy: 0.7725 - val_loss: 0.8808 - learning_rate: 6.2500e-05
+Epoch 66/120
+280/280 - 5s - 18ms/step - accuracy: 0.8249 - loss: 0.5083 - val_accuracy: 0.7685 - val_loss: 0.8880 - learning_rate: 6.2500e-05
+Epoch 67/120
+280/280 - 5s - 18ms/step - accuracy: 0.8281 - loss: 0.5132 - val_accuracy: 0.7779 - val_loss: 0.8740 - learning_rate: 6.2500e-05
+Epoch 68/120
+280/280 - 5s - 18ms/step - accuracy: 0.8256 - loss: 0.5197 - val_accuracy: 0.7645 - val_loss: 0.8940 - learning_rate: 6.2500e-05
+Epoch 69/120
+280/280 - 5s - 18ms/step - accuracy: 0.8290 - loss: 0.5143 - val_accuracy: 0.7645 - val_loss: 0.9108 - learning_rate: 6.2500e-05
+Epoch 70/120
+280/280 - 5s - 18ms/step - accuracy: 0.8295 - loss: 0.5159 - val_accuracy: 0.7645 - val_loss: 0.9038 - learning_rate: 6.2500e-05
+Epoch 71/120
+280/280 - 5s - 18ms/step - accuracy: 0.8270 - loss: 0.5178 - val_accuracy: 0.7739 - val_loss: 0.8901 - learning_rate: 6.2500e-05
+Epoch 72/120
+280/280 - 5s - 18ms/step - accuracy: 0.8260 - loss: 0.5201 - val_accuracy: 0.7699 - val_loss: 0.9077 - learning_rate: 6.2500e-05
+Epoch 73/120
+280/280 - 5s - 18ms/step - accuracy: 0.8324 - loss: 0.5064 - val_accuracy: 0.7699 - val_loss: 0.8898 - learning_rate: 6.2500e-05
+Epoch 74/120
+280/280 - 5s - 18ms/step - accuracy: 0.8245 - loss: 0.5160 - val_accuracy: 0.7699 - val_loss: 0.8759 - learning_rate: 3.1250e-05
+Epoch 75/120
+280/280 - 5s - 18ms/step - accuracy: 0.8297 - loss: 0.5121 - val_accuracy: 0.7766 - val_loss: 0.8909 - learning_rate: 3.1250e-05
+Epoch 76/120
+280/280 - 5s - 18ms/step - accuracy: 0.8278 - loss: 0.5092 - val_accuracy: 0.7793 - val_loss: 0.8918 - learning_rate: 3.1250e-05
+Epoch 77/120
+280/280 - 5s - 16ms/step - accuracy: 0.8342 - loss: 0.4951 - val_accuracy: 0.7712 - val_loss: 0.8854 - learning_rate: 3.1250e-05
+Epoch 78/120
+280/280 - 5s - 17ms/step - accuracy: 0.8399 - loss: 0.4805 - val_accuracy: 0.7712 - val_loss: 0.8906 - learning_rate: 3.1250e-05
+Epoch 79/120
+280/280 - 5s - 16ms/step - accuracy: 0.8284 - loss: 0.4946 - val_accuracy: 0.7739 - val_loss: 0.8862 - learning_rate: 3.1250e-05
+
+=== ASL core200 ===
+CROSS-SIGNER test accuracy : 67.75%   (top-5 90.05%)
+classes                    : 200
+published SOTA, 2731 signs : ~62%  (different task size)
+
+accuracy vs capture rate (test split, signer-disjoint)
+distinct frames       top-1    top-5
+4                    58.33%   84.00%  <- device operating point
+5                    62.53%   87.12%  <- device operating point
+6                    64.29%   88.24%  <- device operating point
+8                    65.41%   88.77%
+12                   66.97%   89.47%
+30                   67.75%   90.05%
+Saved artifact at 'C:\Users\Dan\AppData\Local\Temp\tmpe9zw2ds7'. The following endpoints are available:
+
+* Endpoint 'serve'
+  args_0 (POSITIONAL_ONLY): TensorSpec(shape=(None, 30, 226), dtype=tf.float32, name='keras_tensor')
+Output Type:
+  TensorSpec(shape=(None, 200), dtype=tf.float32, name=None)
+Captures:
+  2117169610576: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2117169610000: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2117171069392: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2117171069008: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2117171069200: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2117171069584: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2117171069776: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2117171069968: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2117171070736: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2117171070160: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2117171071504: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2117171070928: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2117171071312: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2117171071120: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2117171070544: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2117171072656: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2117171072272: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  2117171073232: TensorSpec(shape=(), dtype=tf.resource, name=None)
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+W0000 00:00:1787122075.704627    1740 tf_tfl_flatbuffer_helpers.cc:364] Ignored output_format.
+W0000 00:00:1787122075.705202    1740 tf_tfl_flatbuffer_helpers.cc:367] Ignored drop_control_dependency.
+I0000 00:00:1787122075.747326    1740 mlir_graph_optimization_pass.cc:437] MLIR V1 optimization pass is not enabled
+TFLite: asl_core200.tflite  (652 KB)

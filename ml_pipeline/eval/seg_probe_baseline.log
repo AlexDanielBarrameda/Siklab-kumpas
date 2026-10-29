@@ -1,0 +1,22 @@
+
+model asl_525_best.keras   6,378 test clips
+clean, correctly segmented           67.69%   <- reference
+
+TRUNCATED  (gate opens late / closes early)
+  keeps central  90% of the sign       66.85%
+  keeps central  75% of the sign       64.94%
+  keeps central  60% of the sign       60.87%
+  keeps central  50% of the sign       58.44%
+  keeps central  35% of the sign       49.56%
+
+PADDED  (gate opens early / closes late; sign is centred)
+   20% of window is static padding   65.87%
+   35% of window is static padding   63.09%
+   50% of window is static padding   55.44%
+   65% of window is static padding   43.51%
+
+SHIFTED  (right length, wrong offset)
+  offset -6 frames                   58.70%
+  offset -3 frames                   65.68%
+  offset +3 frames                   64.38%
+  offset +6 frames                   57.92%

@@ -1,0 +1,69 @@
+
+[asl_everyday_best.keras: 80-class subset, scored on 982 of 6,378 test clips]
+
+=== asl_everyday_best.keras ===
+condition                                      top-1   top-5   shown
+--------------------------------------------------------------------
+corpus framing, 30 frames   (as published)    71.49%  92.26%  65.99%
+corpus framing, 5 frames                      67.62%  90.84%  62.63%
+DEVICE framing, 30 frames                     64.56%  88.80%  58.86%
+DEVICE framing, 5 frames    (live condition)  59.78%  87.27%  54.07%
+                                                               ^ correct AND above 0.6
+
+[asl_500_best.keras: 500-class subset, scored on 6,081 of 6,378 test clips]
+
+=== asl_500_best.keras ===
+condition                                      top-1   top-5   shown
+--------------------------------------------------------------------
+corpus framing, 30 frames   (as published)    68.41%  88.19%  58.41%
+corpus framing, 5 frames                      61.70%  84.31%  50.91%
+DEVICE framing, 30 frames                     51.57%  80.09%  42.26%
+DEVICE framing, 5 frames    (live condition)  45.04%  73.77%  35.16%
+                                                               ^ correct AND above 0.6
+
+=== asl_525_best.keras ===
+condition                                      top-1   top-5   shown
+--------------------------------------------------------------------
+corpus framing, 30 frames   (as published)    67.69%  88.44%  59.02%
+corpus framing, 5 frames                      60.98%  84.09%  51.13%
+DEVICE framing, 30 frames                     55.33%  81.98%  46.82%
+DEVICE framing, 5 frames    (live condition)  48.06%  75.53%  39.35%
+                                                               ^ correct AND above 0.6
+
+=== asl_525cal_best.keras ===
+condition                                      top-1   top-5   shown
+--------------------------------------------------------------------
+corpus framing, 30 frames   (as published)    66.82%  88.52%  55.74%
+corpus framing, 5 frames                      60.55%  84.71%  49.98%
+DEVICE framing, 30 frames                     48.65%  78.55%  39.37%
+DEVICE framing, 5 frames    (live condition)  43.46%  72.97%  33.43%
+                                                               ^ correct AND above 0.6
+
+=== asl_525frame_best.keras ===
+condition                                      top-1   top-5   shown
+--------------------------------------------------------------------
+corpus framing, 30 frames   (as published)    67.18%  88.33%  55.77%
+corpus framing, 5 frames                      60.57%  84.09%  49.00%
+DEVICE framing, 30 frames                     66.68%  88.27%  55.22%
+DEVICE framing, 5 frames    (live condition)  59.86%  83.94%  48.12%
+                                                               ^ correct AND above 0.6
+
+=== asl_525wide_best.keras ===
+condition                                      top-1   top-5   shown
+--------------------------------------------------------------------
+corpus framing, 30 frames   (as published)    66.82%  88.08%  56.71%
+corpus framing, 5 frames                      60.61%  83.82%  49.76%
+DEVICE framing, 30 frames                     66.26%  87.00%  55.21%
+DEVICE framing, 5 frames    (live condition)  59.13%  83.11%  48.26%
+                                                               ^ correct AND above 0.6
+
+[asl_core200_best.keras: 200-class subset, scored on 2,431 of 6,378 test clips]
+
+=== asl_core200_best.keras ===
+condition                                      top-1   top-5   shown
+--------------------------------------------------------------------
+corpus framing, 30 frames   (as published)    67.75%  90.05%  60.67%
+corpus framing, 5 frames                      62.53%  87.12%  53.76%
+DEVICE framing, 30 frames                     67.42%  89.96%  59.93%
+DEVICE framing, 5 frames    (live condition)  61.95%  87.29%  53.06%
+                                                               ^ correct AND above 0.6

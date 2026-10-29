@@ -1,0 +1,591 @@
+{
+  "clips": {
+    "AFTERNOON": {
+      "duration": 1.4,
+      "file": "AFTERNOON.mp4"
+    },
+    "AGAIN": {
+      "duration": 1.5,
+      "file": "AGAIN.mp4"
+    },
+    "ALWAYS": {
+      "duration": 1.5,
+      "file": "ALWAYS.mp4"
+    },
+    "AND": {
+      "duration": 1.2,
+      "file": "AND.mp4"
+    },
+    "ANYONE": {
+      "duration": 1.3,
+      "file": "ANYONE.mp4"
+    },
+    "BAD": {
+      "duration": 1.0,
+      "file": "BAD.mp4"
+    },
+    "BATHROOM": {
+      "duration": 2.033,
+      "file": "BATHROOM.mp4"
+    },
+    "BECAUSE": {
+      "duration": 1.3,
+      "file": "BECAUSE.mp4"
+    },
+    "BORED": {
+      "duration": 1.0,
+      "file": "BORED.mp4"
+    },
+    "BOY": {
+      "duration": 1.3,
+      "file": "BOY.mp4"
+    },
+    "BREAKFAST": {
+      "duration": 1.3,
+      "file": "BREAKFAST.mp4"
+    },
+    "BUT": {
+      "duration": 1.0,
+      "file": "BUT.mp4"
+    },
+    "CAN": {
+      "duration": 1.0,
+      "file": "CAN.mp4"
+    },
+    "CLOTHES": {
+      "duration": 1.3,
+      "file": "CLOTHES.mp4"
+    },
+    "COLD": {
+      "duration": 1.3,
+      "file": "COLD.mp4"
+    },
+    "COME": {
+      "duration": 1.3,
+      "file": "COME.mp4"
+    },
+    "DEAF": {
+      "duration": 1.3,
+      "file": "DEAF.mp4"
+    },
+    "DOCTOR": {
+      "duration": 1.3,
+      "file": "DOCTOR.mp4"
+    },
+    "DRINK": {
+      "duration": 1.3,
+      "file": "DRINK.mp4"
+    },
+    "EACH": {
+      "duration": 1.0,
+      "file": "EACH.mp4"
+    },
+    "EAT": {
+      "duration": 1.0,
+      "file": "EAT.mp4"
+    },
+    "EVERYDAY": {
+      "duration": 1.0,
+      "file": "EVERYDAY.mp4"
+    },
+    "FAMILY": {
+      "duration": 1.0,
+      "file": "FAMILY.mp4"
+    },
+    "FATHER": {
+      "duration": 1.3,
+      "file": "FATHER.mp4"
+    },
+    "FEEL": {
+      "duration": 1.0,
+      "file": "FEEL.mp4"
+    },
+    "FINE": {
+      "duration": 1.067,
+      "file": "FINE.mp4"
+    },
+    "FINISH": {
+      "duration": 1.3,
+      "file": "FINISH.mp4"
+    },
+    "FOR": {
+      "duration": 1.3,
+      "file": "FOR.mp4"
+    },
+    "FRIEND": {
+      "duration": 1.4,
+      "file": "FRIEND.mp4"
+    },
+    "GIRL": {
+      "duration": 1.2,
+      "file": "GIRL.mp4"
+    },
+    "GO": {
+      "duration": 1.3,
+      "file": "GO.mp4"
+    },
+    "GOOD": {
+      "duration": 1.0,
+      "file": "GOOD.mp4"
+    },
+    "HANDSOME": {
+      "duration": 1.5,
+      "file": "HANDSOME.mp4"
+    },
+    "HAPPY": {
+      "duration": 1.0,
+      "file": "HAPPY.mp4"
+    },
+    "HE": {
+      "duration": 1.033,
+      "file": "HE.mp4"
+    },
+    "HEADACHE": {
+      "duration": 1.3,
+      "file": "HEADACHE.mp4"
+    },
+    "HEARING": {
+      "duration": 1.0,
+      "file": "HEARING.mp4"
+    },
+    "HELLO": {
+      "duration": 1.667,
+      "file": "HELLO.mp4"
+    },
+    "HIS": {
+      "duration": 1.3,
+      "file": "HIS.mp4"
+    },
+    "HOME": {
+      "duration": 1.0,
+      "file": "HOME.mp4"
+    },
+    "HOSPITAL": {
+      "duration": 1.3,
+      "file": "HOSPITAL.mp4"
+    },
+    "HOTEL": {
+      "duration": 1.2,
+      "file": "HOTEL.mp4"
+    },
+    "HOW": {
+      "duration": 1.0,
+      "file": "HOW.mp4"
+    },
+    "HUG": {
+      "duration": 1.2,
+      "file": "HUG.mp4"
+    },
+    "HUNGRY": {
+      "duration": 1.0,
+      "file": "HUNGRY.mp4"
+    },
+    "HUSBAND": {
+      "duration": 1.067,
+      "file": "HUSBAND.mp4"
+    },
+    "IDLE": {
+      "duration": 2.0,
+      "file": "IDLE.mp4"
+    },
+    "IF": {
+      "duration": 1.0,
+      "file": "IF.mp4"
+    },
+    "KID": {
+      "duration": 1.0,
+      "file": "KID.mp4"
+    },
+    "KISS": {
+      "duration": 1.0,
+      "file": "KISS.mp4"
+    },
+    "KNOW": {
+      "duration": 1.0,
+      "file": "KNOW.mp4"
+    },
+    "LAUGH": {
+      "duration": 1.0,
+      "file": "LAUGH.mp4"
+    },
+    "LETTER_A": {
+      "duration": 1.0,
+      "file": "LETTER_A.mp4"
+    },
+    "LETTER_B": {
+      "duration": 1.0,
+      "file": "LETTER_B.mp4"
+    },
+    "LETTER_C": {
+      "duration": 1.0,
+      "file": "LETTER_C.mp4"
+    },
+    "LETTER_D": {
+      "duration": 1.0,
+      "file": "LETTER_D.mp4"
+    },
+    "LETTER_E": {
+      "duration": 1.0,
+      "file": "LETTER_E.mp4"
+    },
+    "LETTER_F": {
+      "duration": 1.0,
+      "file": "LETTER_F.mp4"
+    },
+    "LETTER_G": {
+      "duration": 1.033,
+      "file": "LETTER_G.mp4"
+    },
+    "LETTER_H": {
+      "duration": 1.567,
+      "file": "LETTER_H.mp4"
+    },
+    "LETTER_I": {
+      "duration": 0.767,
+      "file": "LETTER_I.mp4"
+    },
+    "LETTER_J": {
+      "duration": 1.5,
+      "file": "LETTER_J.mp4"
+    },
+    "LETTER_K": {
+      "duration": 1.6,
+      "file": "LETTER_K.mp4"
+    },
+    "LETTER_L": {
+      "duration": 1.267,
+      "file": "LETTER_L.mp4"
+    },
+    "LETTER_M": {
+      "duration": 1.0,
+      "file": "LETTER_M.mp4"
+    },
+    "LETTER_N": {
+      "duration": 1.333,
+      "file": "LETTER_N.mp4"
+    },
+    "LETTER_O": {
+      "duration": 1.333,
+      "file": "LETTER_O.mp4"
+    },
+    "LETTER_P": {
+      "duration": 1.233,
+      "file": "LETTER_P.mp4"
+    },
+    "LETTER_Q": {
+      "duration": 1.167,
+      "file": "LETTER_Q.mp4"
+    },
+    "LETTER_R": {
+      "duration": 1.333,
+      "file": "LETTER_R.mp4"
+    },
+    "LETTER_S": {
+      "duration": 1.333,
+      "file": "LETTER_S.mp4"
+    },
+    "LETTER_T": {
+      "duration": 1.0,
+      "file": "LETTER_T.mp4"
+    },
+    "LETTER_U": {
+      "duration": 1.1,
+      "file": "LETTER_U.mp4"
+    },
+    "LETTER_V": {
+      "duration": 1.467,
+      "file": "LETTER_V.mp4"
+    },
+    "LETTER_W": {
+      "duration": 1.433,
+      "file": "LETTER_W.mp4"
+    },
+    "LETTER_X": {
+      "duration": 1.433,
+      "file": "LETTER_X.mp4"
+    },
+    "LETTER_Y": {
+      "duration": 1.333,
+      "file": "LETTER_Y.mp4"
+    },
+    "LETTER_Z": {
+      "duration": 1.5,
+      "file": "LETTER_Z.mp4"
+    },
+    "LIKE": {
+      "duration": 1.0,
+      "file": "LIKE.mp4"
+    },
+    "LISTEN": {
+      "duration": 1.0,
+      "file": "LISTEN.mp4"
+    },
+    "LOVE": {
+      "duration": 1.2,
+      "file": "LOVE.mp4"
+    },
+    "MAN": {
+      "duration": 1.0,
+      "file": "MAN.mp4"
+    },
+    "MANY": {
+      "duration": 1.0,
+      "file": "MANY.mp4"
+    },
+    "MAYBE": {
+      "duration": 1.0,
+      "file": "MAYBE.mp4"
+    },
+    "ME": {
+      "duration": 1.1,
+      "file": "ME.mp4"
+    },
+    "MINE": {
+      "duration": 1.0,
+      "file": "MINE.mp4"
+    },
+    "MONEY": {
+      "duration": 1.0,
+      "file": "MONEY.mp4"
+    },
+    "MORE": {
+      "duration": 1.0,
+      "file": "MORE.mp4"
+    },
+    "MORNING": {
+      "duration": 1.0,
+      "file": "MORNING.mp4"
+    },
+    "MOTHER": {
+      "duration": 1.0,
+      "file": "MOTHER.mp4"
+    },
+    "MUST": {
+      "duration": 1.0,
+      "file": "MUST.mp4"
+    },
+    "MY": {
+      "duration": 1.0,
+      "file": "MY.mp4"
+    },
+    "MYSELF": {
+      "duration": 1.0,
+      "file": "MYSELF.mp4"
+    },
+    "NAME": {
+      "duration": 1.567,
+      "file": "NAME.mp4"
+    },
+    "NEED": {
+      "duration": 1.0,
+      "file": "NEED.mp4"
+    },
+    "NO": {
+      "duration": 1.0,
+      "file": "NO.mp4"
+    },
+    "NOON": {
+      "duration": 0.967,
+      "file": "NOON.mp4"
+    },
+    "NOT": {
+      "duration": 1.0,
+      "file": "NOT.mp4"
+    },
+    "NOW": {
+      "duration": 1.0,
+      "file": "NOW.mp4"
+    },
+    "OTHER": {
+      "duration": 1.0,
+      "file": "OTHER.mp4"
+    },
+    "PARENTS": {
+      "duration": 1.0,
+      "file": "PARENTS.mp4"
+    },
+    "PHONE": {
+      "duration": 1.0,
+      "file": "PHONE.mp4"
+    },
+    "PIZZA": {
+      "duration": 1.0,
+      "file": "PIZZA.mp4"
+    },
+    "PLEASE": {
+      "duration": 1.7,
+      "file": "PLEASE.mp4"
+    },
+    "READ": {
+      "duration": 1.2,
+      "file": "READ.mp4"
+    },
+    "REALLY": {
+      "duration": 1.0,
+      "file": "REALLY.mp4"
+    },
+    "RESTAURANT": {
+      "duration": 1.0,
+      "file": "RESTAURANT.mp4"
+    },
+    "SAD": {
+      "duration": 1.0,
+      "file": "SAD.mp4"
+    },
+    "SELF": {
+      "duration": 1.0,
+      "file": "SELF.mp4"
+    },
+    "SHOULD": {
+      "duration": 1.0,
+      "file": "SHOULD.mp4"
+    },
+    "SICK": {
+      "duration": 1.0,
+      "file": "SICK.mp4"
+    },
+    "SIGN": {
+      "duration": 1.0,
+      "file": "SIGN.mp4"
+    },
+    "SOMETIMES": {
+      "duration": 1.0,
+      "file": "SOMETIMES.mp4"
+    },
+    "SOON": {
+      "duration": 1.0,
+      "file": "SOON.mp4"
+    },
+    "SORRY": {
+      "duration": 1.0,
+      "file": "SORRY.mp4"
+    },
+    "TEACH": {
+      "duration": 1.0,
+      "file": "TEACH.mp4"
+    },
+    "THANK_YOU": {
+      "duration": 1.0,
+      "file": "THANK_YOU.mp4"
+    },
+    "TIME": {
+      "duration": 1.0,
+      "file": "TIME.mp4"
+    },
+    "TO": {
+      "duration": 1.0,
+      "file": "TO.mp4"
+    },
+    "TODAY": {
+      "duration": 1.0,
+      "file": "TODAY.mp4"
+    },
+    "TOMORROW": {
+      "duration": 1.0,
+      "file": "TOMORROW.mp4"
+    },
+    "UNDERSTAND": {
+      "duration": 1.0,
+      "file": "UNDERSTAND.mp4"
+    },
+    "WANT": {
+      "duration": 1.0,
+      "file": "WANT.mp4"
+    },
+    "WATER": {
+      "duration": 1.0,
+      "file": "WATER.mp4"
+    },
+    "WELCOME": {
+      "duration": 1.0,
+      "file": "WELCOME.mp4"
+    },
+    "WHAT": {
+      "duration": 1.5,
+      "file": "WHAT.mp4"
+    },
+    "WHERE": {
+      "duration": 1.2,
+      "file": "WHERE.mp4"
+    },
+    "WHO": {
+      "duration": 1.0,
+      "file": "WHO.mp4"
+    },
+    "WHY": {
+      "duration": 1.0,
+      "file": "WHY.mp4"
+    },
+    "WIFE": {
+      "duration": 1.067,
+      "file": "WIFE.mp4"
+    },
+    "WILL": {
+      "duration": 1.0,
+      "file": "WILL.mp4"
+    },
+    "WITH": {
+      "duration": 1.0,
+      "file": "WITH.mp4"
+    },
+    "WOMAN": {
+      "duration": 1.0,
+      "file": "WOMAN.mp4"
+    },
+    "WORLD": {
+      "duration": 1.0,
+      "file": "WORLD.mp4"
+    },
+    "WRITE": {
+      "duration": 1.0,
+      "file": "WRITE.mp4"
+    },
+    "YES": {
+      "duration": 1.0,
+      "file": "YES.mp4"
+    },
+    "YESTERDAY": {
+      "duration": 1.0,
+      "file": "YESTERDAY.mp4"
+    },
+    "YOU": {
+      "duration": 1.033,
+      "file": "YOU.mp4"
+    },
+    "YOUR": {
+      "duration": 1.2,
+      "file": "YOUR.mp4"
+    }
+  },
+  "height": 1024,
+  "idle": "IDLE",
+  "letters": {
+    "A": "LETTER_A",
+    "B": "LETTER_B",
+    "C": "LETTER_C",
+    "D": "LETTER_D",
+    "E": "LETTER_E",
+    "F": "LETTER_F",
+    "G": "LETTER_G",
+    "H": "LETTER_H",
+    "I": "LETTER_I",
+    "J": "LETTER_J",
+    "K": "LETTER_K",
+    "L": "LETTER_L",
+    "M": "LETTER_M",
+    "N": "LETTER_N",
+    "O": "LETTER_O",
+    "P": "LETTER_P",
+    "Q": "LETTER_Q",
+    "R": "LETTER_R",
+    "S": "LETTER_S",
+    "T": "LETTER_T",
+    "U": "LETTER_U",
+    "V": "LETTER_V",
+    "W": "LETTER_W",
+    "X": "LETTER_X",
+    "Y": "LETTER_Y",
+    "Z": "LETTER_Z"
+  },
+  "width": 720
+}

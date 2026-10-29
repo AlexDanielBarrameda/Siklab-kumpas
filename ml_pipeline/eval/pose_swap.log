@@ -1,0 +1,41 @@
+extracting 150 clips with pose_landmarker_full...
+INFO: Created TensorFlow Lite XNNPACK delegate for CPU.
+W0000 00:00:1787121092.954286   15884 inference_feedback_manager.cc:121] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787121093.013141   15884 inference_feedback_manager.cc:121] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787121093.155599   24988 inference_feedback_manager.cc:121] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787121093.177835   18800 inference_feedback_manager.cc:121] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787121093.396767   24960 landmark_projection_calculator.cc:81] Using NORM_RECT without IMAGE_DIMENSIONS is only supported for the square ROI. Provide IMAGE_DIMENSIONS or use PROJECTION_MATRIX.
+   25/150
+   50/150
+   75/150
+   100/150
+   125/150
+   150/150
+extracting 150 clips with pose_landmarker_lite...
+W0000 00:00:1787121546.677290   32728 inference_feedback_manager.cc:121] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787121546.690811    8276 inference_feedback_manager.cc:121] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787121546.840431   19732 inference_feedback_manager.cc:121] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+W0000 00:00:1787121546.858989   30620 inference_feedback_manager.cc:121] Feedback manager requires a model with a single signature inference. Disabling support for feedback tensors.
+   25/150
+   50/150
+   75/150
+   100/150
+   125/150
+   150/150
+
+usable clips: full 147, lite 147, paired 147
+
+============================================================
+AGREEMENT
+============================================================
+  pose landmark |difference|  median 0.0151   p90 0.3595   max 1.9696
+  frames where lite found NO pose but full did: 0 / 4410  (0.00%)
+
+============================================================
+ACCURACY
+============================================================
+  full (matches training)     74.15%   (n=147)
+  lite (device would use)     68.71%   (n=147)
+
+  A large drop means lite must not be swapped in without re-extracting
+  the corpus and retraining on lite features.

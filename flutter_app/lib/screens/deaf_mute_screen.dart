@@ -1,5 +1,45 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:torch_light/torch_light.dart';
 import '../main.dart';
+import '../services/speech_service.dart';
+import '../theme/tokens.dart';
+import '../widgets/app_scaffold.dart';
+import '../widgets/onboarding_tour.dart';
+import '../widgets/transitions.dart';
+import '../widgets/recognition_view.dart';
+
+/// A quick message: what the screen shows, and what the engine is given.
+///
+/// The two are allowed to differ because Android's TTS spells any token it
+/// cannot find in its lexicon, and the words that matter most here — "Pipe",
+/// "pakikipag-usap" — are exactly the ones an ENGLISH lexicon does not
+/// contain. The same display/spoken split already exists for fingerspelled
+/// words in InferenceService, for the same reason.
+class QuickMessage {
+  /// Shown on screen. Always the correctly spelled sentence.
+  final String display;
+
+  /// Respelled so an English voice pronounces it. Null when none is needed.
+  final String? englishVoiceForm;
+
+  const QuickMessage(this.display, [this.englishVoiceForm]);
+
+  /// What to hand the engine, given the voice actually in use.
+  ///
+  /// The respelling applies ONLY when the engine has fallen back to English. A
+  /// Filipino voice reads "Pipe" correctly on its own, and feeding it "Pee-peh"
+  /// would make it worse — so the override is scoped exactly to the case that
+  /// needs it, rather than applied unconditionally.
+  String spokenFor(String ttsLanguage) {
+    final l = ttsLanguage.toLowerCase();
+    final filipinoVoice = l.startsWith('fil') || l.startsWith('tl');
+    return (!filipinoVoice && englishVoiceForm != null)
+        ? englishVoiceForm!
+        : display;
+  }
+}
 
 class DeafMuteScreen extends StatefulWidget {
   const DeafMuteScreen({super.key});
@@ -9,26 +49,81 @@ class DeafMuteScreen extends StatefulWidget {
 }
 
 class _DeafMuteScreenState extends State<DeafMuteScreen> {
-  static const _orange = Color(0xFFFF6B00);
+  /// The signal button starts as a labelled pill and shrinks to the bare bell
+  /// after this long, freeing the screen once the affordance has been read.
+  static const _collapseAfter = Duration(seconds: 3);
 
-  bool _isDetecting = false;
-  List<String> _translationLog = [];
+  /// Clearance kept at the bottom of the scroll area so content can be scrolled
+  /// clear of the floating signal button.
+  static const _signalReserve = 70.0;
 
-  final List<String> _preRecordedEn = [
-    'None',
-    'Hello, can I talk to you?',
-    'Excuse me, may I have a moment?',
-    'Hi, can you help me with something?',
-    'Good day! Can we have a conversation?',
+  bool _signalCollapsed = false;
+  Timer? _collapseTimer;
+
+  final List<QuickMessage> _preRecordedEn = const [
+    QuickMessage('None'),
+    // First after None, and deliberately so.
+    //
+    // This is the one thing whose whole purpose is to be SPOKEN at a hearing
+    // stranger, and the situation it is for is the worst one to fail in. A
+    // button says it in one tap every time; routing it through sign
+    // recognition would put the model and the confidence gate between the
+    // user and the sentence they most need to land.
+    QuickMessage("I'm Deaf. I communicate through sign language."),
+    QuickMessage("I'm Mute. I communicate through sign language."),
+    QuickMessage('Hello, can I talk to you?'),
+    QuickMessage('Excuse me, may I have a moment?'),
+    QuickMessage('Hi, can you help me with something?'),
+    QuickMessage('Good day! Can we have a conversation?'),
   ];
 
-  final List<String> _preRecordedFil = [
-    'Wala',
-    'Kumusta, maari ka bang makausap?',
-    'Pasensya na, maari po bang makahingi ng sandali?',
-    'Hi, maari mo ba akong tulungan?',
-    'Magandang araw! Maari ba tayong mag-usap?',
+  final List<QuickMessage> _preRecordedFil = const [
+    QuickMessage('Wala'),
+    QuickMessage(
+      'Bingi po ako. Sign language po ang paraan ko ng pakikipag-usap.',
+      // The hyphen is what an English voice reads as a break before an unknown
+      // token, which is how "usap" came out spelled letter by letter.
+      'Bingi po ako. Sign language po ang paraan ko ng pakikipag oosap.',
+    ),
+    QuickMessage(
+      'Pipe po ako. Sign language po ang paraan ko ng pakikipag-usap.',
+      // "Pipe" is an English word, so an English voice says /paip/ with total
+      // confidence. Two syllables have to be spelled into it.
+      'Pee-peh po ako. Sign language po ang paraan ko ng pakikipag oosap.',
+    ),
+    QuickMessage('Kumusta, maari ka bang makausap?'),
+    QuickMessage('Pasensya na, maari po bang makahingi ng sandali?'),
+    QuickMessage('Hi, maari mo ba akong tulungan?'),
+    QuickMessage('Magandang araw! Maari ba tayong mag-usap?'),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _collapseTimer = Timer(_collapseAfter, () {
+      if (mounted) setState(() => _signalCollapsed = true);
+    });
+    // First run only. Held until the push animation has settled, or the dialog
+    // appears mid-transition and the screen behind it is still sliding.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      afterRouteTransition(context, () {
+        if (!mounted) return;
+        final app = SiklabKumpasApp.of(context);
+        OnboardingTour.maybeShow(
+          context,
+          TourId.initiator,
+          (app?.language ?? 'en') == 'fil',
+        );
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _collapseTimer?.cancel();
+    super.dispose();
+  }
 
   void _showSignalModal(BuildContext context, bool isFilipino) {
     showModalBottomSheet(
@@ -45,275 +140,38 @@ class _DeafMuteScreenState extends State<DeafMuteScreen> {
   @override
   Widget build(BuildContext context) {
     final app = SiklabKumpasApp.of(context);
-    final isDark = app?.isDark ?? true;
-    final lang = app?.language ?? 'en';
-    final isFilipino = lang == 'fil';
+    final isFilipino = (app?.language ?? 'en') == 'fil';
 
-    final bgColor =
-        isDark ? const Color(0xFF0D0D0D) : const Color(0xFFF5F0FF);
-    final cardColor = isDark ? const Color(0xFF1A1A2E) : Colors.white;
-    final textColor = isDark ? Colors.white : const Color(0xFF1A1A2E);
-    final subtitleColor = isDark ? Colors.white54 : Colors.black45;
-
-    return Scaffold(
-      backgroundColor: bgColor,
-      body: SafeArea(
-        child: Column(
+    return AppScaffold(
+      helpTour: TourId.initiator,
+      showBack: true,
+      title: isFilipino ? 'Modong Tagapagsimula' : 'Initiator Mode',
+      subtitle: isFilipino ? 'Bingi / Pipi POV' : 'Deaf / Mute POV',
+      modeLine: isFilipino
+          ? 'Sign Language → Teksto + Pagsasalita'
+          : 'Sign Language → Text + Speech',
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        // The signal button floats over the scrolling content instead of
+        // sitting under it in a Column, so it stays reachable no matter how
+        // far the translation log has grown.
+        child: Stack(
           children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Icon(Icons.arrow_back_ios_new_rounded,
-                        color: textColor, size: 20),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          isFilipino ? 'Initiator Mode' : 'Initiator Mode',
-                          style: TextStyle(
-                            color: textColor,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Text(
-                          isFilipino ? 'Bingi / Pipi POV' : 'Deaf / Mute POV',
-                          style: TextStyle(
-                              color: subtitleColor, fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+            Positioned.fill(
+              child: RecognitionView(
+                isFilipino: isFilipino,
+                bottomInset: _signalReserve,
               ),
             ),
-
-            // Mode label
-            Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  isFilipino
-                      ? 'FSL → Teksto + Pagsasalita'
-                      : 'FSL → Text + Speech Conversion',
-                  style: const TextStyle(
-                    color: _orange,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-
-            // Signal button
-            Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: GestureDetector(
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: _SignalButton(
+                collapsed: _signalCollapsed,
+                label: isFilipino
+                    ? 'Senyas para sa Pag-uusap'
+                    : 'Signal for Conversation',
                 onTap: () => _showSignalModal(context, isFilipino),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  decoration: BoxDecoration(
-                    color: _isDetecting
-                        ? _orange
-                        : cardColor,
-                    borderRadius: BorderRadius.circular(32),
-                    border: Border.all(
-                      color: _orange.withValues(alpha: 0.3),
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.notifications_outlined,
-                        color: _isDetecting ? Colors.white : textColor,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        isFilipino
-                            ? 'Senyas para sa Pag-uusap'
-                            : 'Signal for Conversation',
-                        style: TextStyle(
-                          color:
-                              _isDetecting ? Colors.white : textColor,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // Camera view
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1A2332),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: _orange.withValues(alpha: 0.4),
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Stack(
-                    children: [
-                      // Camera placeholder
-                      Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.camera_alt_outlined,
-                                color: Colors.white24, size: 48),
-                            const SizedBox(height: 8),
-                            Text(
-                              isFilipino
-                                  ? 'Kamera'
-                                  : 'Camera',
-                              style: const TextStyle(
-                                  color: Colors.white24, fontSize: 13),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // LIVE badge
-                      Positioned(
-                        top: 12,
-                        left: 12,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.red,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: const [
-                              Icon(Icons.circle,
-                                  color: Colors.white, size: 8),
-                              SizedBox(width: 4),
-                              Text(
-                                'LIVE',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      // Start/Stop detecting button
-                      Positioned(
-                        bottom: 12,
-                        right: 12,
-                        child: GestureDetector(
-                          onTap: () =>
-                              setState(() => _isDetecting = !_isDetecting),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: _isDetecting
-                                  ? Colors.red
-                                  : _orange,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              _isDetecting
-                                  ? (isFilipino ? 'Ihinto' : 'Stop')
-                                  : (isFilipino ? 'Simulan' : 'Start'),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // Translation output log
-            Container(
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: cardColor,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.circle,
-                          color: Colors.red, size: 8),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.circle,
-                          color: Colors.orange, size: 8),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.circle,
-                          color: Colors.green, size: 8),
-                      const SizedBox(width: 8),
-                      Text(
-                        isFilipino
-                            ? 'Output ng Pagsalin (Teksto + Pagsasalita)'
-                            : 'Translation Output (Text + Speech)',
-                        style: TextStyle(
-                            color: subtitleColor, fontSize: 11),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _isDetecting
-                        ? (isFilipino
-                            ? '> Naghihintay ng sign input...'
-                            : '> Waiting for sign input...')
-                        : (isFilipino
-                            ? '> Pindutin ang Simulan para magsimula'
-                            : '> Press Start to begin detecting'),
-                    style: TextStyle(
-                      color: _isDetecting ? _orange : subtitleColor,
-                      fontSize: 13,
-                      fontFamily: 'monospace',
-                    ),
-                  ),
-                  if (_translationLog.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    ..._translationLog.map((log) => Text(
-                          '> $log',
-                          style: TextStyle(
-                              color: textColor, fontSize: 13),
-                        )),
-                  ],
-                ],
               ),
             ),
           ],
@@ -323,9 +181,129 @@ class _DeafMuteScreenState extends State<DeafMuteScreen> {
   }
 }
 
+/// Orange pill that shrinks to a circular bell. Tapping it opens the signal
+/// sheet in either state.
+///
+/// Deliberately not AnimatedCrossFade. Its default layout builder pins the
+/// outgoing child with `top: 0.0` and no bottom constraint, so the label sat
+/// flush against the top of the capsule instead of centred; and because the two
+/// children had different intrinsic heights it animated the capsule's *height*
+/// as well, re-laying out the column on every frame. Here the height is a
+/// constant [_height] and only the label's width collapses, so the bell holds
+/// its baseline and the column never reflows.
+class _SignalButton extends StatefulWidget {
+  final bool collapsed;
+  final String label;
+  final VoidCallback onTap;
+
+  const _SignalButton({
+    required this.collapsed,
+    required this.label,
+    required this.onTap,
+  });
+
+  static const _height = 56.0;
+
+  @override
+  State<_SignalButton> createState() => _SignalButtonState();
+}
+
+class _SignalButtonState extends State<_SignalButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 460),
+    // 1.0 = fully expanded, 0.0 = bare bell.
+    value: widget.collapsed ? 0.0 : 1.0,
+  );
+
+  late final Animation<double> _t = CurvedAnimation(
+    parent: _controller,
+    curve: Curves.easeInOutCubic,
+  );
+
+  @override
+  void didUpdateWidget(_SignalButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.collapsed != oldWidget.collapsed) {
+      widget.collapsed ? _controller.reverse() : _controller.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const bell =
+        Icon(Icons.notifications_rounded, color: Colors.white, size: 22);
+
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: AnimatedBuilder(
+        animation: _t,
+        builder: (context, _) {
+          return Container(
+            height: _SignalButton._height,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: AppTokens.orange,
+              borderRadius:
+                  BorderRadius.circular(_SignalButton._height / 2),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTokens.orange.withValues(alpha: 0.35),
+                  blurRadius: 18,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Fixed-width slot equal to the collapsed diameter, so the bell
+                // stays perfectly centred at both ends of the animation.
+                const SizedBox(
+                  width: _SignalButton._height,
+                  child: Center(child: bell),
+                ),
+                ClipRect(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: _t.value,
+                    child: Opacity(
+                      opacity: _t.value,
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 22),
+                        child: Text(
+                          widget.label,
+                          maxLines: 1,
+                          softWrap: false,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _SignalModal extends StatefulWidget {
   final bool isFilipino;
-  final List<String> preRecorded;
+  final List<QuickMessage> preRecorded;
 
   const _SignalModal({
     required this.isFilipino,
@@ -340,242 +318,260 @@ class _SignalModalState extends State<_SignalModal> {
   bool _flickerEnabled = false;
   int _selectedMessage = 0;
 
-  static const _orange = Color(0xFFFF6B00);
-
   @override
   Widget build(BuildContext context) {
-    final app = SiklabKumpasApp.of(context);
-    final isDark = app?.isDark ?? true;
+    final c = AppColors.of(SiklabKumpasApp.of(context)?.isDark ?? true);
     final isFilipino = widget.isFilipino;
-
-    final bgColor = isDark ? const Color(0xFF1A1A2E) : Colors.white;
-    final cardColor =
-        isDark ? const Color(0xFF0D0D0D) : const Color(0xFFF5F5F5);
-    final textColor = isDark ? Colors.white : const Color(0xFF1A1A2E);
-    final subtitleColor = isDark ? Colors.white54 : Colors.black45;
 
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: bgColor,
+        color: c.panel,
         borderRadius: BorderRadius.circular(24),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Title row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    isFilipino
-                        ? 'Senyas para sa Pag-uusap'
-                        : 'Signal for Conversation',
-                    style: TextStyle(
-                      color: textColor,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  Text(
-                    isFilipino
-                        ? 'Pumili kung paano kunin ang kanilang atensyon'
-                        : 'Choose how to get their attention',
-                    style:
-                        TextStyle(color: subtitleColor, fontSize: 12),
-                  ),
-                ],
-              ),
-              GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Icon(Icons.close, color: subtitleColor),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 20),
-
-          // Flicker lights section
-          Row(
-            children: [
-              const Icon(Icons.lightbulb_outline,
-                  color: _orange, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                isFilipino ? 'Kumikislap na Ilaw' : 'Flicker Lights',
-                style: TextStyle(
-                  color: textColor,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            isFilipino
-                ? 'I-flash ang screen para makuha ang atensyon'
-                : 'Flash the screen to get attention',
-            style: TextStyle(color: subtitleColor, fontSize: 12),
-          ),
-          const SizedBox(height: 10),
-
-          // Flicker toggle
-          Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: _flickerEnabled
-                  ? _orange.withValues(alpha: 0.1)
-                  : cardColor,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color:
-                    _flickerEnabled ? _orange : Colors.transparent,
-                width: 1.5,
-              ),
-            ),
-            child: Row(
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  isFilipino ? 'Kumikislap na Ilaw' : 'Flicker Lights',
-                  style: TextStyle(
-                    color: _flickerEnabled ? _orange : textColor,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Switch(
-                  value: _flickerEnabled,
-                  onChanged: (v) =>
-                      setState(() => _flickerEnabled = v),
-                  activeColor: _orange,
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // Audio spiel section
-          Row(
-            children: [
-              const Icon(Icons.volume_up_rounded,
-                  color: _orange, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                isFilipino ? 'Mag-play ng Audio Spiel' : 'Play Audio Spiel',
-                style: TextStyle(
-                  color: textColor,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            isFilipino
-                ? 'Pumili ng pre-recorded na mensahe'
-                : 'Select a pre-recorded message',
-            style: TextStyle(color: subtitleColor, fontSize: 12),
-          ),
-          const SizedBox(height: 10),
-
-          // Message list
-          ...List.generate(widget.preRecorded.length, (i) {
-            final isSelected = _selectedMessage == i;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: GestureDetector(
-                onTap: () => setState(() => _selectedMessage = i),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? _orange.withValues(alpha: 0.1)
-                        : cardColor,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isSelected ? _orange : Colors.transparent,
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Row(
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Text(
-                          widget.preRecorded[i],
-                          style: TextStyle(
-                            color: isSelected ? _orange : textColor,
-                            fontSize: 14,
-                            fontWeight: isSelected
-                                ? FontWeight.w600
-                                : FontWeight.w400,
-                          ),
+                      Text(
+                        isFilipino
+                            ? 'Senyas para sa Pag-uusap'
+                            : 'Signal for Conversation',
+                        style: TextStyle(
+                          color: c.text,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                      if (isSelected)
-                        const Icon(Icons.circle,
-                            color: _orange, size: 10),
+                      Text(
+                        isFilipino
+                            ? 'Pumili kung paano kunin ang kanilang atensyon'
+                            : 'Choose how to get their attention',
+                        style: TextStyle(color: c.subtitle, fontSize: 12),
+                      ),
                     ],
                   ),
                 ),
-              ),
-            );
-          }),
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Icon(Icons.close, color: c.subtitle),
+                ),
+              ],
+            ),
 
-          const SizedBox(height: 16),
+            const SizedBox(height: 20),
 
-          // Start conversation button
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                // Signal logic will be wired here
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _orange,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(32),
+            // Flicker section
+            Row(
+              children: [
+                Icon(Icons.lightbulb_outline, color: c.orange, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  isFilipino ? 'Kumikislap na Ilaw' : 'Flicker Lights',
+                  style: TextStyle(
+                    color: c.text,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              isFilipino
+                  ? 'I-flash ang screen para makuha ang atensyon'
+                  : 'Flash the screen to get attention',
+              style: TextStyle(color: c.subtitle, fontSize: 12),
+            ),
+            const SizedBox(height: 10),
+
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              decoration: BoxDecoration(
+                color: _flickerEnabled
+                    ? c.orange.withValues(alpha: 0.1)
+                    : c.panelAlt,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _flickerEnabled ? c.orange : Colors.transparent,
+                  width: 1.5,
                 ),
               ),
-              child: Text(
-                isFilipino
-                    ? 'Simulan ang Pag-uusap'
-                    : 'Start Conversation',
-                style: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w700),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    isFilipino ? 'Kumikislap na Ilaw' : 'Flicker Lights',
+                    style: TextStyle(
+                      color: _flickerEnabled ? c.orange : c.text,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Switch(
+                    value: _flickerEnabled,
+                    onChanged: (v) => setState(() => _flickerEnabled = v),
+                    activeThumbColor: c.orange,
+                    activeTrackColor: c.orange.withValues(alpha: 0.3),
+                  ),
+                ],
               ),
             ),
-          ),
 
-          const SizedBox(height: 10),
+            const SizedBox(height: 20),
 
-          // Cancel button
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                isFilipino ? 'Kanselahin' : 'Cancel',
-                style: TextStyle(color: subtitleColor, fontSize: 15),
+            // Audio spiel section
+            Row(
+              children: [
+                Icon(Icons.volume_up_rounded, color: c.orange, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  isFilipino ? 'Mag-play ng Audio Spiel' : 'Play Audio Spiel',
+                  style: TextStyle(
+                    color: c.text,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              isFilipino
+                  ? 'Pumili ng pre-recorded na mensahe'
+                  : 'Select a pre-recorded message',
+              style: TextStyle(color: c.subtitle, fontSize: 12),
+            ),
+            const SizedBox(height: 10),
+
+            ...List.generate(widget.preRecorded.length, (i) {
+              final isSelected = _selectedMessage == i;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: GestureDetector(
+                  onTap: () => setState(() => _selectedMessage = i),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? c.orange.withValues(alpha: 0.1)
+                          : c.panelAlt,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected ? c.orange : Colors.transparent,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            widget.preRecorded[i].display,
+                            style: TextStyle(
+                              color: isSelected ? c.orange : c.text,
+                              fontSize: 14,
+                              fontWeight: isSelected
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
+                            ),
+                          ),
+                        ),
+                        if (isSelected)
+                          Icon(Icons.circle, color: c.orange, size: 10),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+
+            const SizedBox(height: 16),
+
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton(
+                onPressed: () async {
+                  Navigator.pop(context); // Close the modal
+
+                  // Flash the torch 3 times
+                  if (_flickerEnabled) {
+                    try {
+                      final isAvailable = await TorchLight.isTorchAvailable();
+                      if (isAvailable) {
+                        for (int i = 0; i < 3; i++) {
+                          await TorchLight.enableTorch();
+                          await Future.delayed(
+                              const Duration(milliseconds: 200));
+                          await TorchLight.disableTorch();
+                          await Future.delayed(
+                              const Duration(milliseconds: 200));
+                        }
+                      }
+                    } catch (e) {
+                      debugPrint('Torch error: $e');
+                    }
+                  }
+
+                  // Play the audio spiel if not "None" (index 0)
+                  if (_selectedMessage > 0) {
+                    // AWAITED. Both calls are async and neither used to be, so
+                    // setLanguage was still in flight when speak() started —
+                    // the utterance went out on whatever voice was loaded
+                    // before, which is how a Filipino message came out read by
+                    // an English voice, and why "usap" was spelled.
+                    await SpeechService.setTTSLanguage(
+                        isFilipino ? 'fil' : 'en');
+                    final msg = widget.preRecorded[_selectedMessage];
+                    await SpeechService.speak(
+                        msg.spokenFor(SpeechService.ttsLanguage));
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: c.orange,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(32),
+                  ),
+                ),
+                child: Text(
+                  isFilipino
+                      ? 'Simulan ang Pag-uusap'
+                      : 'Start Conversation',
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w700),
+                ),
               ),
             ),
-          ),
-        ],
+
+            const SizedBox(height: 10),
+
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  isFilipino ? 'Kanselahin' : 'Cancel',
+                  style: TextStyle(color: c.subtitle, fontSize: 15),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

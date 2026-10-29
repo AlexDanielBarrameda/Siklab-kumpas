@@ -1,0 +1,61 @@
+
+==================================================================
+5-FOLD CROSS-VALIDATION - FSL-105 canonicalised word model
+==================================================================
+per-fold accuracy : 96.95%, 97.65%, 96.71%, 96.01%, 97.65%
+mean +/- sd       : 96.99% +/- 0.62%
+pooled accuracy   : 96.99%  (2065/2129 clips)
+single-split figure for reference: 97.19% on 320 clips
+
+WEAKEST CLASSES (recall, n = clips of that class)
+  SEVEN                   66.7%  (n=21)  -> FOUR x4, SIX x2, FIVE x1
+  AUGUST                  72.7%  (n=22)  -> SEPTEMBER x3, APRIL x2, NOVEMBER x1
+  MARCH                   75.0%  (n=20)  -> OCTOBER x5
+  APRIL                   75.0%  (n=20)  -> AUGUST x3, NOVEMBER x2
+  PARENTS                 75.0%  (n=20)  -> UNCLE x5
+  FOUR                    85.0%  (n=20)  -> SEVEN x3
+  UNCLE                   85.7%  (n=21)  -> PARENTS x3
+  NOVEMBER                86.4%  (n=22)  -> MARCH x1, AUGUST x1, DECEMBER x1
+  FEBRUARY                89.5%  (n=19)  -> MARCH x1, OCTOBER x1
+  YOURE WELCOME           90.0%  (n=20)  -> HELLO x1, CORRECT x1
+  SEPTEMBER               90.0%  (n=20)  -> AUGUST x2
+  OCTOBER                 90.0%  (n=20)  -> MARCH x1, DECEMBER x1
+  GOOD AFTERNOON          90.5%  (n=21)  -> GOOD EVENING x2
+  JULY                    90.5%  (n=21)  -> JUNE x1, SEPTEMBER x1
+  HELLO                   95.0%  (n=20)  -> KNOW x1
+
+classes at 100%: 76/105
+
+MOST COMMON CONFUSIONS (true -> predicted, count)
+  MARCH                  -> OCTOBER                5
+  PARENTS                -> UNCLE                  5
+  SEVEN                  -> FOUR                   4
+  FOUR                   -> SEVEN                  3
+  APRIL                  -> AUGUST                 3
+  AUGUST                 -> SEPTEMBER              3
+  UNCLE                  -> PARENTS                3
+  GOOD AFTERNOON         -> GOOD EVENING           2
+  SEVEN                  -> SIX                    2
+  APRIL                  -> NOVEMBER               2
+  AUGUST                 -> APRIL                  2
+  SEPTEMBER              -> AUGUST                 2
+  HELLO                  -> KNOW                   1
+  YOURE WELCOME          -> CORRECT                1
+  YOURE WELCOME          -> HELLO                  1
+  YES                    -> NO                     1
+  FAST                   -> SIX                    1
+  THREE                  -> ONE                    1
+  FIVE                   -> FOUR                   1
+  SEVEN                  -> FIVE                   1
+
+PAIRS OBSERVED ON DEVICE
+  TWO        -> WEDNESDAY    0/20 clips (0%)
+  THREE      -> TWO          0/20 clips (0%)
+  YES        -> YELLOW       0/20 clips (0%)
+  ONE        -> ONE          20/20 clips (100%)
+
+at the app's 0.60 confidence gate:
+  passing the gate     : 97.8% of clips
+  accuracy among those : 98.1%
+  mean conf when right : 0.983
+  mean conf when wrong : 0.711
