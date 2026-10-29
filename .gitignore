@@ -33,3 +33,5 @@ flutter_app/.flutter-plugins-dependencies
 *.env
 !*.env.example
 secrets/
+
+graphify-out/
