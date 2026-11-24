@@ -4,3 +4,5 @@
 # Explicitly set python and text files to always use LF (good for WSL)
 *.py text eol=lf
 *.txt text eol=lf
+# PDFs can be pure ASCII; never let text=auto rewrite their line endings
+*.pdf binary
