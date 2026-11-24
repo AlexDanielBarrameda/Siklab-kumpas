@@ -16,8 +16,12 @@ ml_pipeline/data/processed/
 # flutter_app/assets/avatar/clips/ are committed; these are not.
 avatar_pipeline/masters/
 
-# TFLite models
+# TFLite models. Experiments stay out; the three the app loads are tracked
+# so a fresh clone builds a working app.
 *.tflite
+!flutter_app/assets/models/asl_demo50.tflite
+!flutter_app/assets/models/fsl105_v2canon.tflite
+!flutter_app/assets/models/fsl_letters_canon.tflite
 
 # Flutter
 flutter_app/.dart_tool/
